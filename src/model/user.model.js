@@ -10,16 +10,25 @@ const userSchema = new Schema(
       type: String,
       required: true,
     },
-    email: {
-      type: String,  
+    email: { 
+      type: String, 
+      unique: true, 
+      sparse: true, 
+      validate: [validator.isEmail, 'Invalid email']
+    },
+    password: { 
+      type: String, 
+      select: false,
+      minlength: 8
+    },
+    phoneNumber:  {
+      type: String,
       unique: true,
-      validate: [validator.isEmail, "Please valid Email"],
-    },
-    password: {
-      type: String,
-    },
-    phoneNumber: {
-      type: String,
+      sparse: true,
+      validate: {
+        validator: v => /^\+?[\d\s-]{10,15}$/.test(v),
+        message: 'Invalid phone number'
+      }
     },
     profile_image: {
       public_id: {
@@ -29,23 +38,26 @@ const userSchema = new Schema(
         type: String,
       },
     },
-    role: {
+    role:{
       type: String,
-      enum: ["user", "driver", "admin"],
-      default: "user",
+      enum: ['user', 'driver', 'admin'],
+      default: 'user',
+      immutable: true
     },
     socialAuth: {
       googleId: String,
       facebookId: String,
       appleId: String,
     },
-    firebaseToken: {
-      type: String,
-    },
     referenceToken: {
       type: String,
       require: true,
       default: "-",
+    },
+    status: {
+      type: String,
+      enum: ['active', 'suspended', 'deleted'],
+      default: 'active'
     },
   },
   { timestamps: true }
