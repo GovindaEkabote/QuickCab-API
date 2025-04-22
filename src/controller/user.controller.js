@@ -7,7 +7,6 @@ const responseMessage = require('../constant/responseMessage')
 const httpError = require('../util/httpError')
 
 
-
 // src/controller/api.controller.js
 // exports.self = (req, res) => {
 //    try {

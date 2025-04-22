@@ -11,7 +11,6 @@ const session = require('express-session');
 const config = require('./config/config')
 const { EApplicationEnvironment } = require('./constant/application')
 const AuthRoutes = require('./router/auth.router')
-const UserRoutes = require('./router/user.router.js')
 require('./config/passport')
 const app = express()
 
