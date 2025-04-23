@@ -7,9 +7,9 @@ module.exports = {
     },
     cookieOptions: {
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days in milliseconds
-        sameSite: "none",
+        sameSite: 'none',
         httpOnly: true,
-        secure: true,
+        secure: true
     },
     PRESETN: 'User already Register',
     userNotCreated:
@@ -21,11 +21,20 @@ module.exports = {
     INVALID_OTP: 'Invalid OTP',
     OTP_EXPIRED: 'OTP has expired',
     OTP_VERIFICATION_FAILED: 'OTP verification failed',
-    profileImageUploadedSuccessfully:"Profile image uploaded successfully",
-    PROFILE_NOT_FOUND:'No profile image to delete',
-    PROFILE:'Profile image deleted successfully',
-    userNotFound:'User Not Found',
-    userFetchedSuccessfully: "User fetched successfully",
-    LOGOUT:'Logged out successfully',
-    DeleteProfile:"User profile soft-deleted successfully",
+    profileImageUploadedSuccessfully: 'Profile image uploaded successfully',
+    PROFILE_NOT_FOUND: 'No profile image to delete',
+    PROFILE: 'Profile image deleted successfully',
+    userNotFound: 'User Not Found',
+    userFetchedSuccessfully: 'User fetched successfully',
+    LOGOUT: 'Logged out successfully',
+    DeleteProfile: 'User profile soft-deleted successfully',
+    EMAIL_EXIST: 'Email Id already in use',
+    INVALID_EMAIL_FORMAT: 'Email Format is incorrect',
+    EMAIL_SEND_FAILED: 'Failed to send mail',
+    NO_PENDING_UPDATE: 'No Pending Updates',
+    OTP_ALREADY_VERIFIED: 'OTP Already Verified',
+    TOO_MANY_ATTEMPTS:
+        'You have exceeded maximum OTP attempts. Please try again after 24 hours.',
+    EMAIL_UPDATED: 'Email Updated successfully',
+    UPDATE_FAILED:"Email Updation Failed"
 }
