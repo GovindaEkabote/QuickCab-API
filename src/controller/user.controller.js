@@ -117,3 +117,20 @@ exports.verifyOTP = asyncHandler(async (req, res) => {
     
 });
 
+// Optional: Resend OTP endpoint
+exports.resendOTP = asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    
+    // Check if user is blocked
+    const existingOtp = await Otp.findOne({ userId, type: 'email-update' });
+    if (existingOtp?.blockedUntil && existingOtp.blockedUntil > new Date()) {
+        const hoursLeft = Math.ceil((existingOtp.blockedUntil - new Date()) / (1000 * 60 * 60));
+        return httpResponse(req, res, 429, `Too many attempts. Try again after ${hoursLeft} hours.`);
+    }
+    
+    // Delete existing OTP if not blocked
+    await Otp.deleteOne({ userId, type: 'email-update' });
+    
+    // Call updateEmail again
+    return exports.updateEmail(req, res);
+});
