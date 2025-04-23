@@ -61,3 +61,59 @@ exports.updateEmail = asyncHandler(async (req, res, next) => {
     return httpResponse(req, res, 201, responseMessage.OTP_SENT);
 });
 
+// Verify OTP and complete email update
+exports.verifyOTP = asyncHandler(async (req, res) => {
+    const { otp } = req.body;
+    const userId = req.user.id;
+
+    // Find the OTP record
+    const otpRecord = await Otp.findOne({ userId,type: 'email-update' });
+
+    if (otpRecord?.blockedUntil && otpRecord.blockedUntil > new Date()) {
+        const hoursLeft = Math.ceil((otpRecord.blockedUntil - new Date()) / (1000 * 60 * 60));
+        return httpResponse(req, res, 429, `Too many attempts. Try again after ${hoursLeft} hours.`);
+    }
+
+    // Check if OTP is already verified
+    if (otpRecord.verified) {
+        return httpResponse(req, res, 400, responseMessage.OTP_ALREADY_VERIFIED);
+    }
+
+    // Check if OTP expired
+    if (Date.now() > otpRecord.expiresAt) {
+        await Otp.deleteOne({ userId });
+        return httpResponse(req, res, 400, responseMessage.OTP_EXPIRED);
+    }
+
+    // Check attempts
+    if (otpRecord.attempts >= MAX_OTP_ATTEMPTS) {
+        otpRecord.blockedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        await otpRecord.save();
+        return httpResponse(req, res, 429, responseMessage.TOO_MANY_ATTEMPTS);
+    }
+
+    // Verify OTP
+    if (otp !== otpRecord.otp) {
+        otpRecord.attempts += 1;
+        await otpRecord.save();
+        return httpResponse(req, res, 400, responseMessage.INVALID_OTP);
+    }
+
+    // Mark as verified and update email
+    try {
+        await User.findByIdAndUpdate(userId, { 
+            email: otpRecord.newEmail,
+            emailVerified: true 
+        });
+
+        otpRecord.verified = true;
+        await otpRecord.save();
+
+        return httpResponse(req, res, 200, responseMessage.EMAIL_UPDATED);
+    } catch (error) {
+        console.error('Email update error:', error);
+        return httpResponse(req, res, 500, responseMessage.UPDATE_FAILED);
+    }
+    
+});
+
