@@ -87,3 +87,9 @@ exports.verifyOtp = async (phoneNumber, otpCode, otpType) => {
         };
     }
 };
+
+
+exports.sendSms = async (to, message) => {
+    // Use Twilio / Firebase / or console.log for now
+    console.log(`Sending SMS to ${to}: ${message}`);
+  };

@@ -34,8 +34,10 @@ async function createEmailOtp(userId, newEmail) {
     return otp;
 }
 
+
+
 module.exports = {
     generateOtp,
     transporter,
-    createEmailOtp
+    createEmailOtp,
 };
