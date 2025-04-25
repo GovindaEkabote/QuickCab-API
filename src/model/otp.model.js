@@ -30,7 +30,7 @@ const otpSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['email-update', 'phone-verification', 'password-reset'],
+        enum: ['email-update', 'phone-verification', 'password-reset','phone-update'],
         default: 'email-update'
     },
     attempts: {

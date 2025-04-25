@@ -34,10 +34,14 @@ async function createEmailOtp(userId, newEmail) {
     return otp;
 }
 
-
+const sendSms = async(to, message) => {
+    // Use Twilio / Firebase / or console.log for now
+    console.log(`Sending SMS to ${to}: ${message}`);
+  };
 
 module.exports = {
     generateOtp,
     transporter,
+    sendSms,
     createEmailOtp,
 };

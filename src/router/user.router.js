@@ -14,5 +14,6 @@ router
     .post(verifyAccessToken, userController.resendOTP)
 
 router.route('/user/me/phone').post(verifyAccessToken,userController.sendPhoneUpdateOtp)
+router.route('/user/me/phone/verify').post(verifyAccessToken,userController.verifyPhoneOtpAndUpdate)
 
 module.exports = router

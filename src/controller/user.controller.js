@@ -10,8 +10,8 @@ const {
     transporter,
     pendingEmailUpdates,
     createEmailOtp,
+    sendSms
 } = require('../service/otp.Email.js')
-const { sendSms } = require('../service/otp.service.js')
 
 // Maximum allowed OTP attempts
 const MAX_OTP_ATTEMPTS = 3
@@ -155,17 +155,132 @@ exports.sendPhoneUpdateOtp = asyncHandler(async (req, res) => {
     if (!phoneNumber) {
         return httpResponse(req, res, 400, 'Phone number is required')
     }
+
+    const phoneExists = await User.findOne({
+        phone: phoneNumber,
+        _id: { $ne: req.user._id }
+    })
+    if (phoneExists) {
+        return httpResponse(
+            req,
+            res,
+            400,
+            'Phone number already in use by another account'
+        )
+    }
+    const otpToday = await Otp.countDocuments({
+        userId: req.user.id,
+        type: 'phone-update',
+        createdAt: { $gt: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    })
+    if (otpToday >= 5) {
+        return httpResponse(
+            req,
+            res,
+            429,
+            'Maximum OTP limit reached. Please try again tomorrow.'
+        )
+    }
+
+    // Check for recent OTP requests to prevent spam
+    const recentOtp = await Otp.findOne({
+        userId: req.user._id,
+        type: 'phone-update',
+        createdAt: { $gt: new Date(Date.now() - 1 * 60 * 1000) } // 1 minutes
+    })
+
+    if (recentOtp) {
+        return httpResponse(
+            req,
+            res,
+            429,
+            'Please wait before requesting another OTP'
+        )
+    }
+
     const otpCode = generateOtp()
     const otpEntry = new Otp({
-        userId: req.user.id,
+        userId: req.user._id,
         phoneNumber,
         otp: otpCode,
-        otpType: 'verify',
-        type: 'email-update'
+        type: 'phone-update',
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000) // 15 minutes expiry
     })
-    await otpEntry.save()
-    await sendSms(phoneNumber, `Your OTP for phone update is: ${otpCode}`)
 
-    return httpResponse(req, res, 200, 'OTP sent to new phone number')
+    try {
+        await otpEntry.save()
+        await sendSms(
+            phoneNumber,
+            `Your OTP for phone number update is: ${otpCode}`
+        )
+        return httpResponse(req, res, 200, 'OTP sent to new phone number')
+    } catch (error) {
+        console.error('OTP sending failed:', error)
+        return httpResponse(req, res, 500, 'Failed to send OTP')
+    }
 })
 
+// verify OTP and update Phone Number..
+exports.verifyPhoneOtpAndUpdate = asyncHandler(async (req, res) => {
+    const { phoneNumber, otp } = req.body
+
+    if (!phoneNumber || !otp) {
+        return httpResponse(req, res, 400, 'Phone number and OTP are required')
+    }
+
+    const phoneExists = await User.findOne({phone:phoneNumber, _id:{$ne:req.user._id}})
+    if(phoneExists)
+    {
+        return httpResponse(req, res, 400, 'Phone number already in use by another account');
+    }
+
+    const existingOtp = await Otp.findOne({
+        userId: req.user._id,
+        phoneNumber,
+        otp,
+        type: 'phone-update',
+        verified: false,
+        expiresAt: { $gt: new Date() }
+    })
+
+    if (!existingOtp) {
+        await Otp.updateMany(
+            { userId: req.user._id, phoneNumber, type: 'phone-update' },
+            { $inc: { attempts: 1 } }
+        );
+        return httpResponse(req, res, 400, 'Invalid or expired OTP')
+    }
+
+    try {
+        // Mark OTP as used
+        existingOtp.verified = true
+        await existingOtp.save()
+
+
+        // Invalidate any other OTPs for this operation
+        const updatedUser = await User.findOneAndUpdate(
+            req.user._id,
+            { phoneNumber : phoneNumber },
+            { new: true } // Returns the updated document
+        )
+        if (!updatedUser) {
+            return httpResponse(req, res, 404, 'User not found')
+        }
+
+        await Otp.updateMany(
+            { 
+                userId: req.user._id,
+                type: 'phone-update',
+                verified: false 
+            },
+            { $set: { expiresAt: new Date() } } // Expire immediately
+        );
+
+        return httpResponse(req, res, 200, 'Phone number updated successfully',{
+            phoneNumber: updatedUser.phone
+        })
+    } catch (error) {
+        console.error('Phone update failed:', error)
+        return httpResponse(req, res, 500, 'Failed to update phone number')
+    }
+})
