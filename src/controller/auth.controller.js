@@ -89,7 +89,7 @@ exports.registerUser = asyncHandler(async (req, res, next) => {
         });
 
         // Generate and send OTP
-        const otpResult = await createOtp(phoneNumber, 'verify');
+        const otpResult = await createOtp(phoneNumber, 'verify', user._id);
         if (!otpResult.success) {
             // Rollback user creation if OTP fails
             await User.deleteOne({ _id: user._id });
@@ -119,13 +119,12 @@ exports.registerUser = asyncHandler(async (req, res, next) => {
             {
                 user: userData,
                 phoneNumber,
-                // Only include OTP in development for testing
+                // Include OTP in development mode only
                 ...(config.ENV === EApplicationEnvironment.DEVELOPMENT && {
-                    demoOtp: otpResult.otp
+                    demoOtp: otpResult.otp // Now this is a real generated OTP
                 })
             }
         );
-
     } catch (error) {
         console.error('Registration error:', error);
         return httpResponse(
@@ -225,7 +224,7 @@ exports.loginWithPhone = asyncHandler(async (req, res, next) => {
     }
 
     // If no valid referenceToken, send OTP using OTP service
-    const otpResult = await createOtp(phoneNumber, 'login')
+    const otpResult = await createOtp(phoneNumber, 'login', user._id)
     if (!otpResult.success) {
         return httpResponse(req, res, 500, otpResult.message)
     }
@@ -233,9 +232,9 @@ exports.loginWithPhone = asyncHandler(async (req, res, next) => {
     return httpResponse(req, res, 200, 'OTP sent to your phone number', {
         phoneNumber,
         ...(config.ENV === EApplicationEnvironment.DEVELOPMENT && {
-            demoOtp: otpResult.otp
+            demoOtp: otpResult.otp // Real generated OTP
         })
-    })
+    });
 })
 
 // Verify login OTP

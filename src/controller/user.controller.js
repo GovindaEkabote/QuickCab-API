@@ -284,3 +284,16 @@ exports.verifyPhoneOtpAndUpdate = asyncHandler(async (req, res) => {
         return httpResponse(req, res, 500, 'Failed to update phone number')
     }
 })
+
+
+// Admin Routes for Future
+/*
+1. PUT /users/me/password - Change password
+2.POST /auth/forgot-password - Initiate reset
+
+POST /auth/reset-password - Complete reset
+
+POST /auth/verify-email - Send verification
+
+POST /auth/verify-phone - SMS verification
+*/
