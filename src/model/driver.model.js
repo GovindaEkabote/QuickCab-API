@@ -52,7 +52,7 @@ const driverSchema = new Schema(
         },
         status:{
             type:String,
-            enum:['offline','available','in_ride'],
+            enum:['offline','available','in_ride','busy'],
             default:'offline'
         },
         rating:{
@@ -79,4 +79,4 @@ const driverSchema = new Schema(
     }
 )
 
-module.exports = mongoose.model("User", driverSchema);
+module.exports = mongoose.model("Driver", driverSchema);

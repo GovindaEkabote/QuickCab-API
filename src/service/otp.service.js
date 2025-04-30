@@ -31,7 +31,7 @@ exports.createOtp = async (phoneNumber, otpType = 'login', userId = null) => {
       // OPTIONAL: send actual SMS (must be a verified number on trial)
       try {
         await twilioClient.messages.create({
-          body: `Your OTP is: ${otpCode}`,
+          body: `QuickCab OTP is: ${otpCode} \n Please do not send OTP with anyone.`,
           from: '+15086438142',
           to: phoneNumber,
         });

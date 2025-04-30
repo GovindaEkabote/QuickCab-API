@@ -60,4 +60,4 @@ const riderSchema = new Schema({
     createdAt: Date
 })
 
-module.exports = mongoose.model('Rider', riderSchema)
+module.exports = mongoose.model('Ride', riderSchema)

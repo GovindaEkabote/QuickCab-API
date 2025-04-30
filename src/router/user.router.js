@@ -15,5 +15,6 @@ router
 
 router.route('/user/me/phone').post(verifyAccessToken,userController.sendPhoneUpdateOtp)
 router.route('/user/me/phone/verify').post(verifyAccessToken,userController.verifyPhoneOtpAndUpdate)
+router.route('/user/delete').delete(verifyAccessToken,userController.deleteUserAccount)
 
 module.exports = router

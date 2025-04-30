@@ -36,5 +36,8 @@ module.exports = {
     TOO_MANY_ATTEMPTS:
         'You have exceeded maximum OTP attempts. Please try again after 24 hours.',
     EMAIL_UPDATED: 'Email Updated successfully',
-    UPDATE_FAILED:"Email Updation Failed"
+    UPDATE_FAILED:"Email Updation Failed",
+    ACCOUNT_DELETED:"Account already deleted",
+    ACCOUNT_DELETE: 'Account deleted successfully',
+    ACCOUNT_DELETION_FAILED: 'Failed to delete account'
 }

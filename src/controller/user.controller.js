@@ -1,5 +1,7 @@
 /* eslint-disable no-unused-vars */
 const User = require('../model/user.model')
+const Payment = require('../model/payment.model.js')
+const Ride = require('../model/rider.model.js')
 const Otp = require('../model/otp.model')
 const { asyncHandler } = require('../util/asyncHandler')
 const httpResponse = require('../util/httpResponse')
@@ -12,6 +14,7 @@ const {
     createEmailOtp,
     sendSms
 } = require('../service/otp.Email.js')
+const mongoose = require('mongoose')
 
 // Maximum allowed OTP attempts
 const MAX_OTP_ATTEMPTS = 3
@@ -228,10 +231,17 @@ exports.verifyPhoneOtpAndUpdate = asyncHandler(async (req, res) => {
         return httpResponse(req, res, 400, 'Phone number and OTP are required')
     }
 
-    const phoneExists = await User.findOne({phone:phoneNumber, _id:{$ne:req.user._id}})
-    if(phoneExists)
-    {
-        return httpResponse(req, res, 400, 'Phone number already in use by another account');
+    const phoneExists = await User.findOne({
+        phone: phoneNumber,
+        _id: { $ne: req.user._id }
+    })
+    if (phoneExists) {
+        return httpResponse(
+            req,
+            res,
+            400,
+            'Phone number already in use by another account'
+        )
     }
 
     const existingOtp = await Otp.findOne({
@@ -247,7 +257,7 @@ exports.verifyPhoneOtpAndUpdate = asyncHandler(async (req, res) => {
         await Otp.updateMany(
             { userId: req.user._id, phoneNumber, type: 'phone-update' },
             { $inc: { attempts: 1 } }
-        );
+        )
         return httpResponse(req, res, 400, 'Invalid or expired OTP')
     }
 
@@ -256,11 +266,10 @@ exports.verifyPhoneOtpAndUpdate = asyncHandler(async (req, res) => {
         existingOtp.verified = true
         await existingOtp.save()
 
-
         // Invalidate any other OTPs for this operation
         const updatedUser = await User.findOneAndUpdate(
             req.user._id,
-            { phoneNumber : phoneNumber },
+            { phoneNumber: phoneNumber },
             { new: true } // Returns the updated document
         )
         if (!updatedUser) {
@@ -268,23 +277,117 @@ exports.verifyPhoneOtpAndUpdate = asyncHandler(async (req, res) => {
         }
 
         await Otp.updateMany(
-            { 
+            {
                 userId: req.user._id,
                 type: 'phone-update',
-                verified: false 
+                verified: false
             },
             { $set: { expiresAt: new Date() } } // Expire immediately
-        );
+        )
 
-        return httpResponse(req, res, 200, 'Phone number updated successfully',{
-            phoneNumber: updatedUser.phone
-        })
+        return httpResponse(
+            req,
+            res,
+            200,
+            'Phone number updated successfully',
+            {
+                phoneNumber: updatedUser.phone
+            }
+        )
     } catch (error) {
         console.error('Phone update failed:', error)
         return httpResponse(req, res, 500, 'Failed to update phone number')
     }
 })
 
+// delete account..
+exports.deleteUserAccount = asyncHandler(async (req, res) => {
+    const userId = req.user._id
+
+    const user = await User.findById(userId)
+    if (!user) {
+        return httpResponse(
+            req,
+            res,
+            404,
+            'User not found'
+        );
+    }
+    if (user.status === 'deleted') {
+        return httpResponse(req, res, 400, 'Your account is already deleted.')
+    }
+
+    // 1. Check for active rides
+    const activeRide = await Ride.find({
+        user: userId,
+        status: { $in: ['requested', 'accepted', 'arrived', 'in_progress'] }
+    })
+    if (activeRide.length > 0) {
+        return httpResponse(
+            res,
+            req,
+            400,
+            'Cannot delete account - you have active rides'
+        )
+    }
+
+    // 2. Check for pending payments
+    const pendingPayment = await Payment.find({
+        user: userId,
+        status: 'pending'
+    })
+    if (pendingPayment.length > 0) {
+        return httpResponse(
+            res,
+            req,
+            400,
+            'Cannot delete account - you have pending payments'
+        )
+    }
+
+    // 3. Generate unique deleted email instead of null
+    const timestamp = Date.now()
+    const deletedEmail = `deleted-${userId}-${timestamp}@deleted.com`
+    const deletedPhone = `deleted-${userId}-${timestamp}`
+
+    // 4. Anonymize user (Soft Delete)
+    const deletedUser = await User.findByIdAndUpdate(
+        userId,
+        {
+            $set: {
+                fullName: 'Deleted User',
+                email: deletedEmail,
+                phoneNumber: deletedPhone,
+                password: '',
+                status: 'deleted',
+                referenceToken: null, // Explicitly set to null
+                'socialAuth.googleId': null,
+                'socialAuth.facebookId': null,
+                'socialAuth.appleId': null
+            },
+            $unset: {
+                profile_image: 1
+                // If referenceToken still persists, try unsetting it
+                // referenceToken: 1
+            }
+        },
+        { new: true }
+    )
+
+    // If referenceToken still exists after update, try this alternative approach
+    if (deletedUser.referenceToken) {
+        await User.updateOne({ _id: userId }, { $unset: { referenceToken: 1 } })
+    }
+    res.clearCookie('access_token') // Clear the access token cookie
+    res.clearCookie('refresh_token') // Clear the refresh token cookie
+
+    return httpResponse(req, res, 200, 'Account deleted successfully', {
+        data: {
+            userId: deletedUser._id,
+            deletedAt: deletedUser.updatedAt
+        }
+    })
+})
 
 // Admin Routes for Future
 /*
