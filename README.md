@@ -7,45 +7,44 @@
 Backend API for a Uber-like ride-hailing service with driver management, ride booking, and admin controls.
 
 ## 📁 Project Structure 
-<!-- 
-quickcab-backend/
-├── config/ # Environment configurations
-│ ├── db.js # Database connection
-│ └── cloudinary.js # File upload setup
-│
-├── controllers/ # Business logic
-│ ├── user.controller.js
-│ ├── ride.controller.js
-│ └── admin.controller.js
-│
-├── middleware/ # Authentication & validation
-│ ├── auth.middleware.js
-│ ├── roles.middleware.js
-│ └── errorHandler.js
-│
-├── models/ # MongoDB schemas
-│ ├── User.model.js
-│ ├── Ride.model.js
-│ └── Transaction.model.js
-│
-├── routes/ # API endpoints
-│ ├── user.routes.js
-│ ├── ride.routes.js
-│ └── admin.routes.js
-│
-├── services/ # Third-party integrations
-│ ├── payment.service.js
-│ ├── notification.service.js
-│ └── slackNotifier.js
-│
-├── utils/ # Helper functions
-│ ├── httpResponse.js
-│ └── asyncHandler.js
-│
-├── .env.example # Environment variables template
-├── server.js # Entry point
-└── README.md # You are here
- -->
+
+## quickcab-backend/
+## ├── config/ # Environment configurations
+## │ ├── db.js # Database connection
+## │ └── cloudinary.js # File upload setup
+## │
+## ├── controllers/ # Business logic
+## │ ├── user.controller.js
+## │ ├── ride.controller.js
+## │ └── admin.controller.js
+## │
+## ├── middleware/ # Authentication & validation
+## │ ├── auth.middleware.js
+## │ ├── roles.middleware.js
+## │ └── errorHandler.js
+## │
+## ├── models/ # MongoDB schemas
+## │ ├── User.model.js
+## │ ├── Ride.model.js
+## │ └── Transaction.model.js
+## │
+## ├── routes/ # API endpoints
+## │ ├── user.routes.js
+## │ ├── ride.routes.js
+## │ └── admin.routes.js
+## │
+## ├── services/ # Third-party integrations
+## │ ├── payment.service.js
+## │ ├── notification.service.js
+## │ └── slackNotifier.js
+## │
+## ├── utils/ # Helper functions
+## │ ├── httpResponse.js
+## │ └── asyncHandler.js
+## │
+## ├── .env.example # Environment variables template
+## ├── server.js # Entry point
+## └── README.md # You are here
 
 ## 🔑 Key Features
 
@@ -74,7 +73,7 @@ quickcab-backend/
 ### Installation
 1. Clone repo:
    ```bash
-   git clone https://github.com/yourusername/quickcab-backend.git
+   git clone https://github.com/GovindaEkabote/QuickCab-API
 
 
 <!-- Install dependencies: -->
