@@ -29,6 +29,18 @@ router
 
 router
     .route('/admin/suspend-driver')
-    .put(verifyAccessToken, authorizeRole('admin'), userController.suspendDriver)
+    .put(
+        verifyAccessToken,
+        authorizeRole('admin'),
+        userController.suspendDriver
+    )
+
+router
+    .route('/admin/suspend-drivers')
+    .get(
+        verifyAccessToken,
+        authorizeRole('admin'),
+        userController.getSuspendedDriver
+    )
 
 module.exports = router

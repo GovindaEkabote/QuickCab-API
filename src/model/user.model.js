@@ -56,7 +56,8 @@ const userSchema = new Schema(
         status: {
             type: String,
             enum: ['active', 'suspended', 'deleted'],
-            default: 'active'
+            default: 'active',
+            // isDeleted: false
         },
         suspensionReason: {
             type: String,

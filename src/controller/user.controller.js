@@ -387,56 +387,87 @@ exports.deleteUserAccount = asyncHandler(async (req, res) => {
 
 // Admin Login..
 exports.updateRole = asyncHandler(async (req, res) => {
-    const { fullName, email, phoneNumber, role } = req.body;
+    const { fullName, email, phoneNumber, role } = req.body
 
-    if(!constant.allowedRoles.includes(role)){
-        return httpResponse(req,res,400,'Invalid role value');
+    if (!constant.allowedRoles.includes(role)) {
+        return httpResponse(req, res, 400, 'Invalid role value')
     }
-    const filter = {fullName,email}
-    if(phoneNumber){
-        filter.phoneNumber = phoneNumber;
+    const filter = { fullName, email }
+    if (phoneNumber) {
+        filter.phoneNumber = phoneNumber
     }
-    const user = await User.findOneAndUpdate(
-        filter,
-        {role},
-        {new:true}
-    );
-    if(!user){
-        return httpResponse(req,res,404,'User not found with provided details');
+    const user = await User.findOneAndUpdate(filter, { role }, { new: true })
+    if (!user) {
+        return httpResponse(
+            req,
+            res,
+            404,
+            'User not found with provided details'
+        )
     }
-    return httpResponse(req,res,200,'User role updated successfully',{
+    return httpResponse(req, res, 200, 'User role updated successfully', {
         userId: user._id,
         newRole: user.role
     })
 })
 
+exports.suspendDriver = asyncHandler(async (req, res) => {
+    const { email, reason } = req.body
+    const user = await User.findOne({ email })
+    if (!user) {
+        return httpResponse(req, res, 404, 'Driver Not Found')
+    }
+    if (user.role !== 'driver') {
+        return httpResponse(req, res, 400, 'User is not driver')
+    }
+    if (user.status === constant.USER_STATUS.SUSPENDED) {
+        return httpResponse(req, res, 400, 'Driver is already suspended')
+    }
+    user.status = constant.USER_STATUS.SUSPENDED
+    user.suspensionReason = reason || 'No reason provided'
+    await user.save()
 
-exports.suspendDriver = asyncHandler(async(req,res) =>{
-    const {email,reason } = req.body;
-    const user = await User.findOne({email});
-    if(!user){
-        return httpResponse(req,res,404,"Driver Not Found")
-    }
-    if(user.role !== 'driver'){
-        return httpResponse(req,res,400,"User is not driver")
-    }
-    if(user.status === constant.USER_STATUS.SUSPENDED){
-        return httpResponse(req,res,400,"Driver is already suspended")
-    }
-    user.status = constant.USER_STATUS.SUSPENDED;
-    user.suspensionReason = reason || 'No reason provided';
-    await user.save();
-    
     return httpResponse(req, res, 200, 'Driver suspended successfully', {
         userId: user._id,
         fullName: user.fullName,
         email: user.email,
         status: user.status,
         suspensionReason: user.suspensionReason
-      });      
+    })
 })
 
+exports.getSuspendedDriver = asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1
+    const limit = parseInt(req.query.limit) || 10
+    const skip = (page - 1) * limit
+    const suspendedDriver = await User.find({
+        role: 'driver',
+        status: 'suspended'
+    })
+        .skip(skip)
+        .limit(limit)
+        .select('-password')
 
+    const total = await User.countDocuments({
+        role: 'driver',
+        status: 'suspended'
+    })
+    return httpResponse(
+        req,
+        res,
+        200,
+        'Suspended drivers fetched successfully',
+        {
+            drivers: suspendedDriver,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        }
+    )
+})
 // Admin Routes for Future
 /*
 1. PUT /users/me/password - Change password
