@@ -80,11 +80,13 @@ const userSchema = new Schema(
         suspensionDetails: {
             reason: String,
             suspendedAt: Date,
-            canReactivateAfter: Date // 7  day wait for reactive acc
+            canReactivateAfter: Date, // 7  day wait for reactive acc
+            bannedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            permanentBanReason: String
         },
         reactivationRequest: {
             requestedAt: Date,
-            message: String,
+            reson: String,
             approved: Boolean,
             approvedAt: Date,
             approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
@@ -94,7 +96,13 @@ const userSchema = new Schema(
                 default: 'normal'
             },
             urgentReason: String
-        }
+        },
+        securityLogs: [{
+      action: String, // 'permanent_ban', 'reactivation_request', etc.
+      performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      timestamp: { type: Date, default: Date.now },
+      metadata: mongoose.Schema.Types.Mixed
+    }]
     },
     { timestamps: true }
 )

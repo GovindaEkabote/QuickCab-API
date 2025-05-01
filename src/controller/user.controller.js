@@ -16,7 +16,7 @@ const {
     sendSms
 } = require('../service/otp.Email.js')
 const mongoose = require('mongoose')
-const {slackNotifier} = require('../service/slackNotifier');
+const { slackNotifier } = require('../service/slackNotifier')
 
 // Maximum allowed OTP attempts
 const MAX_OTP_ATTEMPTS = 3
@@ -512,19 +512,25 @@ exports.getActiveDrivers = asyncHandler(async (req, res) => {
 
 //driver request to admin Reactivation account..
 exports.requestReactivation = asyncHandler(async (req, res) => {
-    const { email, priority = 'normal', reason  } = req.body
-    const driver = await User.findOne({ email, role: 'driver' });
+    const { email, priority = 'normal', reason } = req.body
+    const driver = await User.findOne({
+        email,
+        role: 'driver',
+        status: 'suspended'
+    })
     if (!driver) {
+        const existingUser = await User.findOne({ email })
+        if (!existingUser) {
+            return httpResponse(req, res, 404, 'User not found')
+        }
         return httpResponse(
             req,
             res,
             400,
-            'Driver not found'
+            existingUser.status === 'permanently_banned'
+                ? 'Account permanently banned'
+                : 'Account is not suspended'
         )
-    }
-
-    if (driver.status !== 'suspended') {
-        return httpResponse(req, res, 400, 'Account is not suspended')
     }
 
     if (new Date() < driver.suspensionDetails.canRequestReactivationAfter) {
@@ -541,44 +547,128 @@ exports.requestReactivation = asyncHandler(async (req, res) => {
         )
     }
 
-    driver.status = 'reactivation_pending'
-    driver.reactivationRequest = {
-        requestedAt: new Date(),
-        priority,
-        reason,
-        status: 'pending'
+    // 4. Process valid request
+    const updatedDriver = await User.findByIdAndUpdate(
+        driver._id,
+        {
+            status: 'reactivation_pending',
+            reactivationRequest: {
+                requestedAt: new Date(),
+                priority,
+                reason,
+                status: 'pending'
+            }
+        },
+        { new: true }
+    )
+
+    // 5. Notify (async fire-and-forget)
+    try {
+        await slackNotifier(priority, {
+            text: `🔄 Reactivation requested (${priority})`,
+            fields: [
+                { title: 'Driver', value: updatedDriver.email },
+                { title: 'Reason', value: reason }
+            ]
+        })
+    } catch (error) {
+        console.error('Slack notification failed:', error)
     }
-    await driver.save()
-    // Priority-based notification
-    await slackNotifier(priority, driver.email);
-    
-  return httpResponse(req, res, 200, 'Reactivation request submitted');
+
+    return httpResponse(req, res, 200, 'Reactivation request submitted', {
+        requestId: updatedDriver._id,
+        estimatedReviewTime: '24-48 hours'
+    })
 })
 
 exports.handleReactivation = asyncHandler(async (req, res) => {
-    const { driverId, action } = req.body; // action: 'approve'/'reject'
+    const { driverId, action } = req.body // action: 'approve'/'reject'
     // 2. Process request
-    const driver = await User.findById(driverId);
+    const driver = await User.findById(driverId)
     if (!driver?.reactivationRequest) {
-      return httpResponse(req,res, 400,'Invalid reactivation request');
+        return httpResponse(req, res, 400, 'Invalid reactivation request')
     }
-  
-    if (action === 'approve') {
-      driver.status = 'active';
-      driver.reactivationRequest.status = 'approved';
-      await driver.save();
-      return httpResponse(req,res, 200, 'Driver reactivated');
-    } 
-    
-    else if (action === 'reject') {
-      driver.reactivationRequest.status = 'rejected';
-      await driver.save();
-      return httpResponse(req, res, 200, 'Request rejected');
-    }
-  
-    return httpResponse(req,res,400, 'Invalid action');
-  });
 
+    if (action === 'approve') {
+        driver.status = 'active'
+        driver.reactivationRequest.status = 'approved'
+        await driver.save()
+        return httpResponse(req, res, 200, 'Driver reactivated')
+    } else if (action === 'reject') {
+        driver.reactivationRequest.status = 'rejected'
+        await driver.save()
+        return httpResponse(req, res, 200, 'Request rejected')
+    }
+
+    return httpResponse(req, res, 400, 'Invalid action')
+})
+
+// In adminController.js
+exports.banDriverPermanently = asyncHandler(async (req, res) => {
+    const { driverId, reason } = req.body
+
+    const driver = await User.findByIdAndUpdate(
+        {
+            _id: driverId,
+            role: 'driver',
+            status: { $ne: 'permanently_banned' } // Prevent duplicate bans
+        },
+        {
+            $set: {
+                status: 'permanently_banned',
+                suspensionDetails: {
+                    reason,
+                    suspendedAt: new Date(),
+                    permanentBan: true, // Explicit flag
+                    canRequestReactivationAfter: null // Disable future reactivations
+                },
+                reactivationRequest: undefined
+            },
+            $inc: { suspensionCount: 1 }
+        },
+        { new: true, runValidators: true }
+    )
+
+    if (!driver) {
+        const existingDriver =
+            await User.findById(driverId).select('status role')
+        if (!existingDriver) {
+            return httpResponse(req, res, 404, 'Driver not found')
+        }
+        return httpResponse(
+            req,
+            res,
+            400,
+            existingDriver.status === 'permanently_banned'
+                ? 'Driver already permanently banned'
+                : 'Target user is not a driver'
+        )
+    }
+    try {
+        await slackNotifier('critical', {
+            text: `🚨 Permanent ban issued`,
+            fields: [
+                { title: 'Driver', value: driver.email, short: true },
+                { title: 'Admin', value: req.user.email, short: true },
+                { title: 'Reason', value: reason }
+            ]
+        })
+    } catch (slackError) {
+        console.error('Slack notification failed:', slackError)
+    }
+    return httpResponse(
+        req,
+        res,
+        200,
+        'Driver permanently banned successfully',
+        {
+            driverId: driver._id,
+            email: driver.email,
+            bannedAt: driver.suspensionDetails.suspendedAt,
+            referenceId: `BAN-${Date.now()}`
+        }
+    )
+})
 
 // Admin Routes for Future
 /*

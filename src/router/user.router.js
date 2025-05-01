@@ -56,6 +56,18 @@ router
 
 router
     .route('/admin/reactivations/approve')
-    .post(verifyAccessToken,authorizeRole('admin'), userController.handleReactivation)
+    .post(
+        verifyAccessToken,
+        authorizeRole('admin'),
+        userController.handleReactivation
+    )
+
+router
+    .route('/admin/driver/ban')
+    .post(
+        verifyAccessToken,
+        authorizeRole('admin'),
+        userController.banDriverPermanently
+    )
 
 module.exports = router
