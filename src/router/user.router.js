@@ -70,4 +70,12 @@ router
         userController.banDriverPermanently
     )
 
+    router
+    .route('/admin/active/driver')
+    .get(
+        verifyAccessToken,
+        authorizeRole('admin'),
+        userController.getActiveDrivers
+    )
+
 module.exports = router

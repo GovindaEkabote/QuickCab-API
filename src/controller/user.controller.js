@@ -500,14 +500,42 @@ exports.getSuspendedDriverById = asyncHandler(async (req, res) => {
 
 // activateDrivers..
 exports.getActiveDrivers = asyncHandler(async (req, res) => {
-    const driver = await User.findOne({
-        _id: req.params.id,
+    const page = parseInt(req.query.page)
+    const limit = parseInt(req.query.limit)
+    const skip = (page - 1) * limit
+    const query = {
         role: 'driver',
-        status: 'suspend'
-    })
-    if (!driver) {
-        return httpResponse(req, res, 404, 'Driver not found or not suspended')
+        status: 'active'
     }
+    const [driver, total] = await Promise.all([
+        User.find(query).select('-password -__v').skip(skip).limit(limit),
+        User.countDocuments(query)
+    ])
+    if (driver.length === 0) {
+        return httpResponse(req, res, 404, 'No Active drivers', {
+            pagination: { page, limit, total: 0 }
+        })
+    }
+    return httpResponse(
+        req,res,200,'Active drivers retrieved',
+        {
+            driver:driver.map(driver =>({
+                driverId: driver._id,
+                fullName:driver.fullName,
+                email:driver.email,
+                phoneNumber:driver.phoneNumber,
+                profile_image:driver.profile_image?.url,
+                joinedAt: driver.createdAt
+            })),
+            pagination:{
+                page,
+                limit,
+                total,
+                totalPages:Math.ceil(total/limit),
+                hasNextPage: page * limit < total
+            }
+        }
+    )
 })
 
 //driver request to admin Reactivation account..
