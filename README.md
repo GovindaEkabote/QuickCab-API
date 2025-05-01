@@ -1,3 +1,89 @@
+# 🚖 QuickCab - Ride-Hailing API
+
+![Node.js](https://img.shields.io/badge/Node.js-18.x-green)
+![Express](https://img.shields.io/badge/Express-4.x-lightgrey)
+![MongoDB](https://img.shields.io/badge/MongoDB-6.0+-blue)
+
+Backend API for a Uber-like ride-hailing service with driver management, ride booking, and admin controls.
+
+## 📁 Project Structure
+quickcab-backend/
+├── config/ # Environment configurations
+│ ├── db.js # Database connection
+│ └── cloudinary.js # File upload setup
+│
+├── controllers/ # Business logic
+│ ├── user.controller.js
+│ ├── ride.controller.js
+│ └── admin.controller.js
+│
+├── middleware/ # Authentication & validation
+│ ├── auth.middleware.js
+│ ├── roles.middleware.js
+│ └── errorHandler.js
+│
+├── models/ # MongoDB schemas
+│ ├── User.model.js
+│ ├── Ride.model.js
+│ └── Transaction.model.js
+│
+├── routes/ # API endpoints
+│ ├── user.routes.js
+│ ├── ride.routes.js
+│ └── admin.routes.js
+│
+├── services/ # Third-party integrations
+│ ├── payment.service.js
+│ ├── notification.service.js
+│ └── slackNotifier.js
+│
+├── utils/ # Helper functions
+│ ├── httpResponse.js
+│ └── asyncHandler.js
+│
+├── .env.example # Environment variables template
+├── server.js # Entry point
+└── README.md # You are here
+
+
+## 🔑 Key Features
+
+- **User System**
+  - JWT authentication
+  - Role-based access (User/Driver/Admin)
+  - Email/phone verification
+
+- **Ride Management**
+  - Real-time ride booking
+  - Driver tracking
+  - Fare estimation
+
+- **Admin Controls**
+  - Driver suspension/banning
+  - Ride analytics
+  - Financial reporting
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+
+- MongoDB Atlas or local instance
+- Redis (for caching)
+
+### Installation
+1. Clone repo:
+   ```bash
+   git clone https://github.com/yourusername/quickcab-backend.git
+
+
+<!-- Install dependencies: -->
+###  npm install
+<!-- Configure environment:  -->
+# Fill in your credentials
+<!-- Start server: -->
+npm run dev  # Development
+npm start    # Production
+
 ### ✅ Commit Message Types (Conventional Commits Guide)
 
 #### `feat`
