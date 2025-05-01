@@ -6,7 +6,8 @@
 
 Backend API for a Uber-like ride-hailing service with driver management, ride booking, and admin controls.
 
-## 📁 Project Structure
+## 📁 Project Structure 
+<!-- 
 quickcab-backend/
 ├── config/ # Environment configurations
 │ ├── db.js # Database connection
@@ -44,7 +45,7 @@ quickcab-backend/
 ├── .env.example # Environment variables template
 ├── server.js # Entry point
 └── README.md # You are here
-
+ -->
 
 ## 🔑 Key Features
 
