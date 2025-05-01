@@ -411,6 +411,31 @@ exports.updateRole = asyncHandler(async (req, res) => {
 })
 
 
+exports.suspendDriver = asyncHandler(async(req,res) =>{
+    const {email,reason } = req.body;
+    const user = await User.findOne({email});
+    if(!user){
+        return httpResponse(req,res,404,"Driver Not Found")
+    }
+    if(user.role !== 'driver'){
+        return httpResponse(req,res,400,"User is not driver")
+    }
+    if(user.status === constant.USER_STATUS.SUSPENDED){
+        return httpResponse(req,res,400,"Driver is already suspended")
+    }
+    user.status = constant.USER_STATUS.SUSPENDED;
+    user.suspensionReason = reason || 'No reason provided';
+    await user.save();
+    
+    return httpResponse(req, res, 200, 'Driver suspended successfully', {
+        userId: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        status: user.status,
+        suspensionReason: user.suspensionReason
+      });      
+})
+
 
 // Admin Routes for Future
 /*

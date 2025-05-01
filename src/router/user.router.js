@@ -27,4 +27,8 @@ router
     .route('/admin/update-role')
     .put(verifyAccessToken, authorizeRole('admin'), userController.updateRole)
 
+router
+    .route('/admin/suspend-driver')
+    .put(verifyAccessToken, authorizeRole('admin'), userController.suspendDriver)
+
 module.exports = router
