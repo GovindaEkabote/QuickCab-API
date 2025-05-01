@@ -51,7 +51,7 @@ Backend API for a Uber-like ride-hailing service with driver management, ride bo
 - **User System**
   - JWT authentication
   - Role-based access (User/Driver/Admin)
-  - Email/phone verification
+  - Email/phone verification (twilio and nodemailer)
 
 - **Ride Management**
   - Real-time ride booking
