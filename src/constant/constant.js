@@ -1,3 +1,4 @@
 module.exports = {
-    HASH_SALT_ROUNDS: 14
+    HASH_SALT_ROUNDS: 14,
+    allowedRoles : ['user', 'driver', 'admin'],
 }

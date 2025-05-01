@@ -6,6 +6,7 @@ const Otp = require('../model/otp.model')
 const { asyncHandler } = require('../util/asyncHandler')
 const httpResponse = require('../util/httpResponse')
 const responseMessage = require('../constant/responseMessage')
+const constant = require('../constant/constant.js')
 const httpError = require('../util/httpError')
 const {
     generateOtp,
@@ -306,12 +307,7 @@ exports.deleteUserAccount = asyncHandler(async (req, res) => {
 
     const user = await User.findById(userId)
     if (!user) {
-        return httpResponse(
-            req,
-            res,
-            404,
-            'User not found'
-        );
+        return httpResponse(req, res, 404, 'User not found')
     }
     if (user.status === 'deleted') {
         return httpResponse(req, res, 400, 'Your account is already deleted.')
@@ -388,6 +384,33 @@ exports.deleteUserAccount = asyncHandler(async (req, res) => {
         }
     })
 })
+
+// Admin Login..
+exports.updateRole = asyncHandler(async (req, res) => {
+    const { fullName, email, phoneNumber, role } = req.body;
+
+    if(!constant.allowedRoles.includes(role)){
+        return httpResponse(req,res,400,'Invalid role value');
+    }
+    const filter = {fullName,email}
+    if(phoneNumber){
+        filter.phoneNumber = phoneNumber;
+    }
+    const user = await User.findOneAndUpdate(
+        filter,
+        {role},
+        {new:true}
+    );
+    if(!user){
+        return httpResponse(req,res,404,'User not found with provided details');
+    }
+    return httpResponse(req,res,200,'User role updated successfully',{
+        userId: user._id,
+        newRole: user.role
+    })
+})
+
+
 
 // Admin Routes for Future
 /*

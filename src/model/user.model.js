@@ -42,7 +42,6 @@ const userSchema = new Schema(
       type: String,
       enum: ['user', 'driver', 'admin'],
       default: 'user',
-      immutable: true
     },
     socialAuth: {
       googleId: String,

@@ -1,6 +1,7 @@
 const { Router } = require('express')
 const userController = require('../controller/user.controller')
 const { verifyAccessToken } = require('../middleware/auth.middleware')
+const authorizeRole = require('../middleware/authorizeRole')
 const router = Router()
 
 router
@@ -13,8 +14,17 @@ router
     .route('/users/me/email/resend')
     .post(verifyAccessToken, userController.resendOTP)
 
-router.route('/user/me/phone').post(verifyAccessToken,userController.sendPhoneUpdateOtp)
-router.route('/user/me/phone/verify').post(verifyAccessToken,userController.verifyPhoneOtpAndUpdate)
-router.route('/user/delete').delete(verifyAccessToken,userController.deleteUserAccount)
+router
+    .route('/user/me/phone')
+    .post(verifyAccessToken, userController.sendPhoneUpdateOtp)
+router
+    .route('/user/me/phone/verify')
+    .post(verifyAccessToken, userController.verifyPhoneOtpAndUpdate)
+router
+    .route('/user/delete')
+    .delete(verifyAccessToken, userController.deleteUserAccount)
+router
+    .route('/admin/update-role')
+    .put(verifyAccessToken, authorizeRole('admin'), userController.updateRole)
 
 module.exports = router
