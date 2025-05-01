@@ -55,14 +55,27 @@ const userSchema = new Schema(
         },
         status: {
             type: String,
-            enum: ['active', 'suspended', 'deleted'],
-            default: 'active',
+            enum: ['active', 'suspended', 'deleted', 'permanently_banned'],
+            default: 'active'
             // isDeleted: false
         },
         suspensionReason: {
             type: String,
             default: null
         },
+        suspensionCount: {
+            type: Number,
+            default: 0
+        },
+        isBlocked: {
+            type: Boolean,
+            default: false
+        },
+        suspensionDetails: {
+            reason: String,
+            suspendedAt: Date,
+            canReactivateAfter: Date  // 7  day wait for reactive acc
+        }
     },
     { timestamps: true }
 )

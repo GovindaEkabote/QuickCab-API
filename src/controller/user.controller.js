@@ -425,7 +425,11 @@ exports.suspendDriver = asyncHandler(async (req, res) => {
         return httpResponse(req, res, 400, 'Driver is already suspended')
     }
     user.status = constant.USER_STATUS.SUSPENDED
-    user.suspensionReason = reason || 'No reason provided'
+    user.suspensionDetails = {
+        reason,
+        suspendedAt: new Date(),
+        canReactivateAfter: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    }
     await user.save()
 
     return httpResponse(req, res, 200, 'Driver suspended successfully', {
@@ -433,7 +437,7 @@ exports.suspendDriver = asyncHandler(async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         status: user.status,
-        suspensionReason: user.suspensionReason
+        suspensionDetails: user.suspensionDetails
     })
 })
 
@@ -493,6 +497,17 @@ exports.getSuspendedDriverById = asyncHandler(async (req, res) => {
     )
 })
 
+// activateDrivers..
+exports.getActiveDrivers = asyncHandler(async (req, res) => {
+    const driver = await User.findOne({
+        _id: req.params.id,
+        role: 'driver',
+        status: 'suspend'
+    })
+    if (!driver) {
+        return httpResponse(req, res, 404, 'Driver not found or not suspended')
+    }
+})
 // Admin Routes for Future
 /*
 1. PUT /users/me/password - Change password
