@@ -411,6 +411,7 @@ exports.updateRole = asyncHandler(async (req, res) => {
     })
 })
 
+// Suspend Driver..
 exports.suspendDriver = asyncHandler(async (req, res) => {
     const { email, reason } = req.body
     const user = await User.findOne({ email })
@@ -436,6 +437,7 @@ exports.suspendDriver = asyncHandler(async (req, res) => {
     })
 })
 
+// Get All Suspended Drivers..
 exports.getSuspendedDriver = asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1
     const limit = parseInt(req.query.limit) || 10
@@ -468,6 +470,29 @@ exports.getSuspendedDriver = asyncHandler(async (req, res) => {
         }
     )
 })
+
+// get suspended driver by its id..
+exports.getSuspendedDriverById = asyncHandler(async (req, res) => {
+    const { id } = req.params
+
+    const driver = await User.findOne({
+        _id: id,
+        role: 'driver',
+        status: 'suspended'
+    }).select('-password')
+
+    if (!driver) {
+        return httpResponse(req, res, 404, 'Suspended driver not found')
+    }
+    return httpResponse(
+        req,
+        res,
+        200,
+        'Suspended driver details fetched',
+        driver
+    )
+})
+
 // Admin Routes for Future
 /*
 1. PUT /users/me/password - Change password
