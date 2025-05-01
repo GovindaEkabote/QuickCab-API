@@ -55,7 +55,13 @@ const userSchema = new Schema(
         },
         status: {
             type: String,
-            enum: ['active', 'suspended', 'deleted', 'permanently_banned'],
+            enum: [
+                'active',
+                'suspended',
+                'deleted',
+                'permanently_banned',
+                'reactivation_pending'
+            ],
             default: 'active'
             // isDeleted: false
         },
@@ -74,7 +80,20 @@ const userSchema = new Schema(
         suspensionDetails: {
             reason: String,
             suspendedAt: Date,
-            canReactivateAfter: Date  // 7  day wait for reactive acc
+            canReactivateAfter: Date // 7  day wait for reactive acc
+        },
+        reactivationRequest: {
+            requestedAt: Date,
+            message: String,
+            approved: Boolean,
+            approvedAt: Date,
+            approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+            priority: {
+                type: String,
+                enum: ['normal', 'high', 'critical'],
+                default: 'normal'
+            },
+            urgentReason: String
         }
     },
     { timestamps: true }

@@ -16,6 +16,7 @@ const {
     sendSms
 } = require('../service/otp.Email.js')
 const mongoose = require('mongoose')
+const {slackNotifier} = require('../service/slackNotifier');
 
 // Maximum allowed OTP attempts
 const MAX_OTP_ATTEMPTS = 3
@@ -508,6 +509,77 @@ exports.getActiveDrivers = asyncHandler(async (req, res) => {
         return httpResponse(req, res, 404, 'Driver not found or not suspended')
     }
 })
+
+//driver request to admin Reactivation account..
+exports.requestReactivation = asyncHandler(async (req, res) => {
+    const { email, priority = 'normal', reason  } = req.body
+    const driver = await User.findOne({ email, role: 'driver' });
+    if (!driver) {
+        return httpResponse(
+            req,
+            res,
+            400,
+            'Driver not found'
+        )
+    }
+
+    if (driver.status !== 'suspended') {
+        return httpResponse(req, res, 400, 'Account is not suspended')
+    }
+
+    if (new Date() < driver.suspensionDetails.canRequestReactivationAfter) {
+        const daysLeft = Math.ceil(
+            (driver.suspensionDetails.canRequestReactivationAfter -
+                new Date()) /
+                (1000 * 60 * 60 * 24)
+        )
+        return httpResponse(
+            req,
+            res,
+            403,
+            `Request possible in ${daysLeft} days`
+        )
+    }
+
+    driver.status = 'reactivation_pending'
+    driver.reactivationRequest = {
+        requestedAt: new Date(),
+        priority,
+        reason,
+        status: 'pending'
+    }
+    await driver.save()
+    // Priority-based notification
+    await slackNotifier(priority, driver.email);
+    
+  return httpResponse(req, res, 200, 'Reactivation request submitted');
+})
+
+exports.handleReactivation = asyncHandler(async (req, res) => {
+    const { driverId, action } = req.body; // action: 'approve'/'reject'
+    // 2. Process request
+    const driver = await User.findById(driverId);
+    if (!driver?.reactivationRequest) {
+      return httpResponse(req,res, 400,'Invalid reactivation request');
+    }
+  
+    if (action === 'approve') {
+      driver.status = 'active';
+      driver.reactivationRequest.status = 'approved';
+      await driver.save();
+      return httpResponse(req,res, 200, 'Driver reactivated');
+    } 
+    
+    else if (action === 'reject') {
+      driver.reactivationRequest.status = 'rejected';
+      await driver.save();
+      return httpResponse(req, res, 200, 'Request rejected');
+    }
+  
+    return httpResponse(req,res,400, 'Invalid action');
+  });
+
+
 // Admin Routes for Future
 /*
 1. PUT /users/me/password - Change password

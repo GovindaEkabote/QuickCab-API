@@ -50,4 +50,12 @@ router
         userController.getSuspendedDriverById
     )
 
+router
+    .route('/driver/reactive')
+    .post(verifyAccessToken, userController.requestReactivation)
+
+router
+    .route('/admin/reactivations/approve')
+    .post(verifyAccessToken,authorizeRole('admin'), userController.handleReactivation)
+
 module.exports = router
