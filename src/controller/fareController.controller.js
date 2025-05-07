@@ -25,6 +25,33 @@ exports.updateFulePrice = asyncHandler(async (req, res) => {
     })
 })
 
+exports.updateFareConfiguration = asyncHandler(async (req, res) => {
+    const {
+        baseFare,
+        perKmRate,
+        perMinuteRate,
+        fuelSurchargePercentage,
+        minFare,
+        vehicleTypes
+    } = req.body
+
+    await FareConfiguration.updateMany({ isActive: true }, { isActive: false })
+
+    // Create new configuration
+    const newConfig = await FareConfiguration.create({
+        baseFare,
+        perKmRate,
+        perMinuteRate,
+        fuelSurchargePercentage,
+        minFare,
+        vehicleTypes,
+        updatedBy: req.user._id
+    })
+    return httpResponse(req, res, 200, 'Fare configuration updated successfully', {
+        newConfig
+    })
+})
+
 
 
 // Helper function to update fare configurations with fuel surcharge
