@@ -12,6 +12,7 @@ const config = require('./config/config')
 const { EApplicationEnvironment } = require('./constant/application')
 const AuthRoutes = require('./router/auth.router')
 const UserRoutes = require('./router/user.router')
+const fareRoutes  = require('./router/fareRoutes.router')
 
 require('./config/passport')
 const app = express()
@@ -41,6 +42,7 @@ app.set('view engine', 'ejs');
 // Routes
 app.use('/api/v1', AuthRoutes)
 app.use('/api/v1', UserRoutes)
+app.use('/api/v1',fareRoutes )
 
 app.set('views', path.join(__dirname, 'view'));
 
