@@ -52,7 +52,19 @@ exports.updateFareConfiguration = asyncHandler(async (req, res) => {
     })
 })
 
+exports.getCurrentFareConfiguration = asyncHandler(async(req,res) =>{
+    const config = await FareConfiguration.findOne({ isActive: true });
+  const fuelPrices = await FuelPrice.find({ isActive: true });
 
+  if (!config) {
+    return httpResponse(req,res,400, 'No active fare configuration found');
+  }
+
+  return httpResponse(req,res,200, 'Current fare configuration', {
+    fareConfig: config,
+    fuelPrices
+  });
+})
 
 // Helper function to update fare configurations with fuel surcharge
 async function updateFareConfigurationsWithFuelSurcharge() {
