@@ -1,0 +1,1 @@
+const FuelPrice = require('../model/fuelPrice.model')

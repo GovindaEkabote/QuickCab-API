@@ -44,8 +44,8 @@ const riderSchema = new Schema({
         surge: { type: Number, default: 1 },
         total: Number
     },
-    distance: Number, // meters
-    duration: Number, // seconds
+    estimatedDistance: Number, // meters
+    estimatedDuration : Number, // seconds
     payment: { 
         type: mongoose.Schema.ObjectId, 
         ref: 'Payment' 
