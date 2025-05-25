@@ -5,7 +5,7 @@ const responseMessage = require('../constant/responseMessage')
 const httpResponse = require('../util/httpResponse')
 
 exports.updateFulePrice = asyncHandler(async (req, res) => {
-    const { fuelType, pricePerLiter } = req.body;
+    const { fuelType, pricePerLiter } = req.body
     const userId = req.user.id
     await FuelPrice.updateMany(
         { fuelType, isActive: true },
@@ -47,48 +47,57 @@ exports.updateFareConfiguration = asyncHandler(async (req, res) => {
         vehicleTypes,
         updatedBy: req.user._id
     })
-    return httpResponse(req, res, 200, 'Fare configuration updated successfully', {
-        newConfig
-    })
+    return httpResponse(
+        req,
+        res,
+        200,
+        'Fare configuration updated successfully',
+        {
+            newConfig
+        }
+    )
 })
 
-exports.getCurrentFareConfiguration = asyncHandler(async(req,res) =>{
-    const config = await FareConfiguration.findOne({ isActive: true });
-  const fuelPrices = await FuelPrice.find({ isActive: true });
+exports.getCurrentFareConfiguration = asyncHandler(async (req, res) => {
+    const config = await FareConfiguration.findOne({ isActive: true })
+    const fuelPrices = await FuelPrice.find({ isActive: true })
 
-  if (!config) {
-    return httpResponse(req,res,400, 'No active fare configuration found');
-  }
+    if (!config) {
+        return httpResponse(req, res, 400, 'No active fare configuration found')
+    }
 
-  return httpResponse(req,res,200, 'Current fare configuration', {
-    fareConfig: config,
-    fuelPrices
-  });
+    return httpResponse(req, res, 200, 'Current fare configuration', {
+        fareConfig: config,
+        fuelPrices
+    })
 })
 
 // Helper function to update fare configurations with fuel surcharge
 async function updateFareConfigurationsWithFuelSurcharge() {
-    const activeFuelPrices = await FuelPrice.find({ isActive: true });
-    const avgFuelPrice = calculateAverageFuelPrice(activeFuelPrices);
-    
+    const activeFuelPrices = await FuelPrice.find({ isActive: true })
+    const avgFuelPrice = calculateAverageFuelPrice(activeFuelPrices)
+
     // Get current active fare configuration
-    const currentConfig = await FareConfiguration.findOne({ isActive: true });
-    
+    const currentConfig = await FareConfiguration.findOne({ isActive: true })
+
     if (currentConfig) {
-      // Calculate new fuel surcharge percentage based on fuel price change
-      // This is a simplified calculation - adjust based on your business logic
-      const baseFuelPrice = 80; // Your baseline fuel price
-      const priceChange = avgFuelPrice - baseFuelPrice;
-      const newSurcharge = Math.min(Math.max(0, (priceChange / baseFuelPrice) * 100), 20); // Cap at 20%
-      
-      // Update the configuration
-      currentConfig.fuelSurchargePercentage = newSurcharge;
-      await currentConfig.save();
+        // Calculate new fuel surcharge percentage based on fuel price change
+        // This is a simplified calculation - adjust based on your business logic
+        const baseFuelPrice = 80 // Your baseline fuel price
+        const priceChange = avgFuelPrice - baseFuelPrice
+        const newSurcharge = Math.min(
+            Math.max(0, (priceChange / baseFuelPrice) * 100),
+            20
+        ) // Cap at 20%
+
+        // Update the configuration
+        currentConfig.fuelSurchargePercentage = newSurcharge
+        await currentConfig.save()
     }
-  }
-  
-  function calculateAverageFuelPrice(fuelPrices) {
-    if (fuelPrices.length === 0) return 0;
-    const sum = fuelPrices.reduce((acc, curr) => acc + curr.pricePerLiter, 0);
-    return sum / fuelPrices.length;
-  }
+}
+
+function calculateAverageFuelPrice(fuelPrices) {
+    if (fuelPrices.length === 0) return 0
+    const sum = fuelPrices.reduce((acc, curr) => acc + curr.pricePerLiter, 0)
+    return sum / fuelPrices.length
+}

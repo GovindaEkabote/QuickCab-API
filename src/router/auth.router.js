@@ -52,9 +52,12 @@ router.get(
 router.get('/check-login', verifyAccessToken, userController.checkLoginStatus)
 
 // Facebook Auth
-router.get('/facebook', passport.authenticate('facebook', { scope: ['email'] }));
+router.get('/facebook', passport.authenticate('facebook', { scope: ['email'] }))
 
-router.get('/facebook/callback', passport.authenticate('facebook', { session: false }), userController.socialLoginCallback);
-
+router.get(
+    '/facebook/callback',
+    passport.authenticate('facebook', { session: false }),
+    userController.socialLoginCallback
+)
 
 module.exports = router

@@ -3,48 +3,56 @@ const path = require('path')
 const globalErrorHandler = require('./middleware/globalErrorHandler')
 const responseMessage = require('./constant/responseMessage')
 const httpError = require('./util/httpError')
-const helmet = require('helmet');
+const helmet = require('helmet')
 const cors = require('cors')
 const cookieParser = require('cookie-parser')
-const passport = require("passport");
-const session = require('express-session');
+const passport = require('passport')
+const session = require('express-session')
 const config = require('./config/config')
 const { EApplicationEnvironment } = require('./constant/application')
 const AuthRoutes = require('./router/auth.router')
 const UserRoutes = require('./router/user.router')
-const fareRoutes  = require('./router/fareRoutes.router')
+const fareRoutes = require('./router/fareRoutes.router')
+const rideRoutes = require('./router/rideRoutes.router')
+const driverRoutes = require('./router/driver.router')
 
 require('./config/passport')
 const app = express()
 
 // Middleware
-app.use(helmet());
-app.use(cors({
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    origin: 'https://cercacaes.com', 
-    credentials: true
-}))
-app.use(session({
-    secret:config.SESSION_SECRET,
-    resave:false,
-    saveUninitialized:true,
-    cookie:{
-        secure:config.ENV === EApplicationEnvironment.PRODUCTION,
-        maxAge:1000 * 60 * 60 * 24 
-    }
-}))
+app.use(helmet())
+app.use(
+    cors({
+        methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        origin: 'https://cercacaes.com',
+        credentials: true
+    })
+)
+app.use(
+    session({
+        secret: config.SESSION_SECRET,
+        resave: false,
+        saveUninitialized: true,
+        cookie: {
+            secure: config.ENV === EApplicationEnvironment.PRODUCTION,
+            maxAge: 1000 * 60 * 60 * 24
+        }
+    })
+)
 app.use(express.json())
-app.use(cookieParser());
+app.use(cookieParser())
 app.use(express.static(path.join(__dirname, '../', 'public')))
-app.use(passport.initialize());
-app.use(passport.session());
-app.set('view engine', 'ejs');
+app.use(passport.initialize())
+app.use(passport.session())
+app.set('view engine', 'ejs')
 // Routes
 app.use('/api/v1', AuthRoutes)
 app.use('/api/v1', UserRoutes)
-app.use('/api/v1',fareRoutes )
+app.use('/api/v1', fareRoutes)
+app.use('/api/v1', rideRoutes)
+app.use('/api/v1', driverRoutes)
 
-app.set('views', path.join(__dirname, 'view'));
+app.set('views', path.join(__dirname, 'view'))
 
 // 404 Handler
 // eslint-disable-next-line no-unused-vars

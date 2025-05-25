@@ -1,45 +1,239 @@
-/* eslint-disable no-unused-vars */
-const User = require('../model/user.model')
-const Payment = require('../model/payment.model.js')
-const Ride = require('../model/rider.model.js')
-const Otp = require('../model/otp.model')
+const { calculateFare } = require('../service/pricingService.js')
 const { asyncHandler } = require('../util/asyncHandler')
-const httpResponse = require('../util/httpResponse')
-const responseMessage = require('../constant/responseMessage')
-const constant = require('../constant/constant.js')
-const httpError = require('../util/httpError')
 const {
-    generateOtp,
-    transporter,
-    pendingEmailUpdates,
-    createEmailOtp,
-    sendSms
-} = require('../service/otp.Email.js')
-const mongoose = require('mongoose')
-const { slackNotifier } = require('../service/slackNotifier')
+    findNearbyDrivers,
+    notifyDrivers
+} = require('../constant/findNearbyDrivers.js')
+const httpResponse = require('../util/httpResponse')
+const {
+    setDriverResponseTimeout
+} = require('../constant/setDriverResponseTimeout.js')
+const { calculateRoute } = require('../constant/calculateRoute.js')
+const { emitToDriver, emitToUser } = require('../service/socketService')
+const Ride = require('../model/rider.model.js')
+const Driver = require('../model/driver.model.js')
 
-
-const MAX_DRIVER_DISTANCE = 5000  // 5KM
-const DRIVER_RESPONSE_TIMEOUT = 60000;  // 60 seconds to accept
-
-exports.requestRide = asyncHandler(async(req,res) =>{
+exports.requestRide = asyncHandler(async (req, res) => {
     const {
         pickup,
         destination,
-        contactPhone,
-        estimatedDistance, // in meters
-        estimatedDuration // in seconds
-    } = req.body;
+        contactPhone = req.user.phoneNumber,
+        vehicleType = 'standard'
+    } = req.body
 
-    if(!pickup || !destination||!contactPhone || !estimatedDistance || !estimatedDuration){
-        return httpResponse(req,res,400,'Missing required fields')
+    // Enhanced validation with coordinate order checking
+    const validateCoordinates = (coords, name) => {
+        if (!Array.isArray(coords) || coords.length !== 2) {
+            throw new Error(
+                `${name} coordinates must be an array of two numbers`
+            )
+        }
+
+        const [lng, lat] = coords
+        if (typeof lng !== 'number' || typeof lat !== 'number') {
+            throw new Error(`${name} coordinates must contain numbers`)
+        }
+
+        // Check if values might be swapped (common mistake)
+        if (Math.abs(lng) > 180 || Math.abs(lat) > 90) {
+            console.warn(`Potential coordinate order issue in ${name}:`, coords)
+            throw new Error(
+                `${name} coordinates must be in [longitude, latitude] order`
+            )
+        }
+
+        return coords
     }
 
-    if(!pickup.coordinates || pickup.coordinates.length !== 2){
-        return httpResponse(req,res,400,'Invalid Pick coordinates')
-    }
-    if(!destination.coordinates || destination.coordinates.length !== 2){
-        return httpResponse(req,res,400,'Invalid Destination coordinates')
+    try {
+        // Validate inputs
+        if (
+            !pickup ||
+            !destination ||
+            typeof pickup !== 'object' ||
+            typeof destination !== 'object'
+        ) {
+            throw new Error('Pickup and destination objects required')
+        }
+
+        const pickupCoords = validateCoordinates(pickup.coordinates, 'pickup')
+        const destinationCoords = validateCoordinates(
+            destination.coordinates,
+            'destination'
+        )
+
+        if (
+            pickupCoords[0] === destinationCoords[0] &&
+            pickupCoords[1] === destinationCoords[1]
+        ) {
+            throw new Error('Pickup and destination cannot be identical')
+        }
+
+        const validVehicleTypes = ['standard', 'xl', 'premium', 'luxury']
+        if (!validVehicleTypes.includes(vehicleType)) {
+            throw new Error(
+                `Invalid vehicle type. Must be one of: ${validVehicleTypes.join(', ')}`
+            )
+        }
+
+        // Calculate route
+        const { distance: estimatedDistance, duration: estimatedDuration } =
+            await calculateRoute(pickupCoords, destinationCoords)
+
+        if (
+            isNaN(estimatedDistance) ||
+            isNaN(estimatedDuration) ||
+            estimatedDistance <= 0 ||
+            estimatedDuration <= 0
+        ) {
+            throw new Error('Invalid route calculation')
+        }
+
+        // Find nearby drivers
+        const nearbyDrivers = await findNearbyDrivers(pickupCoords, vehicleType)
+
+        if (!nearbyDrivers || nearbyDrivers.length === 0) {
+            // Debug why no drivers are found
+            const availableDrivers = await Driver.countDocuments({
+                status: 'available',
+                isOnline: true,
+                'vehicle.type': vehicleType
+            })
+
+            console.log('Driver availability debug:', {
+                totalAvailable: availableDrivers,
+                searchLocation: pickupCoords,
+                vehicleType
+            })
+
+            throw new Error('No available drivers found nearby')
+        }
+
+        // Calculate fare with fallback
+        let fare
+        try {
+            fare = await calculateFare({
+                distance: estimatedDistance,
+                duration: estimatedDuration,
+                vehicleType
+            })
+
+            if (!fare || typeof fare.total !== 'number' || fare.total <= 0) {
+                throw new Error('Invalid fare calculation')
+            }
+        } catch (fareError) {
+            console.error('Fare calculation error:', fareError)
+            // Fallback fare values
+            fare = {
+                base: 50,
+                distance: (estimatedDistance / 1000) * 10, // 10/km
+                time: (estimatedDuration / 60) * 1, // 1/minute
+                surge: 1,
+                total: Math.max(
+                    100,
+                    (estimatedDistance / 1000) * 10 +
+                        (estimatedDuration / 60) * 1 +
+                        50
+                ),
+                configurationId: null
+            }
+        }
+
+        // Create ride
+        const ride = await Ride.create({
+            user: req.user._id,
+            driver: null, // Will be set when driver accepts
+            pickup: {
+                address: pickup.address || 'Address not specified',
+                coordinates: pickupCoords,
+                contactPhone
+            },
+            destination: {
+                address: destination.address || 'Address not specified',
+                coordinates: destinationCoords
+            },
+            route: {
+                type: 'LineString',
+                coordinates: [pickupCoords, destinationCoords]
+            },
+            estimatedDistance,
+            estimatedDuration,
+            fare,
+            status: 'requested',
+            timeline: {
+                requestedAt: new Date()
+            },
+            vehicleType
+        })
+
+        // Notify drivers
+        try {
+            await notifyDrivers(nearbyDrivers, ride)
+            console.log(`Notified ${nearbyDrivers.length} drivers`)
+        } catch (notificationError) {
+            console.error('Driver notification error:', notificationError)
+            // Continue even if some notifications fail
+        }
+
+        // Set timeout for driver response
+        setDriverResponseTimeout(ride._id)
+
+        // Prepare response data
+        const responseData = {
+            ride: {
+                _id: ride._id,
+                status: ride.status,
+                estimatedFare: fare.total,
+                pickup: ride.pickup,
+                destination: ride.destination,
+                vehicleType: ride.vehicleType,
+                estimatedArrivalTime: new Date(
+                    Date.now() + estimatedDuration * 1000
+                ),
+                nearbyDrivers: nearbyDrivers.length,
+                drivers: nearbyDrivers.map((driver) => ({
+                    id: driver._id,
+                    name: driver.userDetails?.name || 'Driver',
+                    phone: driver.userDetails?.phoneNumber || 'Not available',
+                    vehicle: {
+                        type: driver.vehicle?.type || 'standard',
+                        make: driver.vehicle?.make || 'Unknown',
+                        model: driver.vehicle?.model || 'Unknown',
+                        year: driver.vehicle?.year || null,
+                        color: driver.vehicle?.color || 'Unknown',
+                        plateNumber: driver.vehicle?.plateNumber || 'Unknown'
+                    },
+                    distance: `${Math.round(driver.distance)} meters`,
+                    rating: driver.rating || 5.0,
+                    profileImage: driver.userDetails?.profile_image || null
+                })),
+                expiresAt: new Date(Date.now() + 60000) // 1 minute expiry
+            }
+        }
+
+        return httpResponse(
+            req,
+            res,
+            201,
+            'Ride requested successfully',
+            responseData
+        )
+    } catch (error) {
+        console.error('Ride request failed:', {
+            error: error.message,
+            stack: error.stack,
+            body: req.body,
+            user: req.user?._id
+        })
+
+        const statusCode =
+            error.name === 'ValidationError'
+                ? 400
+                : error.message.includes('No available')
+                  ? 404
+                  : 500
+
+        return httpResponse(req, res, statusCode, error.message)
     }
 })
 

@@ -8,7 +8,7 @@ const devSmsMiddleware = (req, res, next) => {
             return true
         }
     }
-    next();
+    next()
 }
 
-module.exports = devSmsMiddleware;
+module.exports = devSmsMiddleware

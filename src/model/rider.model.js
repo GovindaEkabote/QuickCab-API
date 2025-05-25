@@ -9,8 +9,8 @@ const riderSchema = new Schema({
     },
     driver: {
         type: mongoose.Schema.ObjectId,
-        ref: 'Driver',
-        required: true
+        ref: 'Driver'
+        // required: true
     },
     pickup: {
         address: String,
@@ -38,17 +38,17 @@ const riderSchema = new Schema({
         default: 'requested'
     },
     fare: {
-        base: Number,
-        distance: Number,
-        time: Number,
-        surge: { type: Number, default: 1 },
-        total: Number
+        base: { type: Number, required: true },
+        distance: { type: Number, required: true },
+        time: { type: Number, required: true },
+        surge: { type: Number, default: 1, min: 1 },
+        total: { type: Number, required: true }
     },
     estimatedDistance: Number, // meters
-    estimatedDuration : Number, // seconds
-    payment: { 
-        type: mongoose.Schema.ObjectId, 
-        ref: 'Payment' 
+    estimatedDuration: Number, // seconds
+    payment: {
+        type: mongoose.Schema.ObjectId,
+        ref: 'Payment'
     },
     timeline: {
         requestedAt: Date,

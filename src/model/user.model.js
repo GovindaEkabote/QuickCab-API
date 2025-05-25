@@ -97,12 +97,17 @@ const userSchema = new Schema(
             },
             urgentReason: String
         },
-        securityLogs: [{
-      action: String, // 'permanent_ban', 'reactivation_request', etc.
-      performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-      timestamp: { type: Date, default: Date.now },
-      metadata: mongoose.Schema.Types.Mixed
-    }]
+        securityLogs: [
+            {
+                action: String, // 'permanent_ban', 'reactivation_request', etc.
+                performedBy: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'User'
+                },
+                timestamp: { type: Date, default: Date.now },
+                metadata: mongoose.Schema.Types.Mixed
+            }
+        ]
     },
     { timestamps: true }
 )

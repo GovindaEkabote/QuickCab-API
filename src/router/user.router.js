@@ -70,7 +70,7 @@ router
         userController.banDriverPermanently
     )
 
-    router
+router
     .route('/admin/active/driver')
     .get(
         verifyAccessToken,

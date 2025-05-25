@@ -54,14 +54,13 @@ const paymentSchema = new Schema({
             processedAt: Date
         }
     ],
-    promoCode:{
-        code:String,
-        discountApplied:Number,
-        originalAmount:Number
+    promoCode: {
+        code: String,
+        discountApplied: Number,
+        originalAmount: Number
     },
     gatewayResponse: Object,
     createdAt: Date
 })
-
 
 module.exports = mongoose.model('Payment', paymentSchema)

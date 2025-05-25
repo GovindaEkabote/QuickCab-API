@@ -18,13 +18,13 @@ const httpResponse = (
             message: responseMessage,
             data,
             req
-        });
+        })
 
         if (config.ENV === EApplicationEnvironment.PRODUCTION) {
-            delete response.request.ip;
+            delete response.request.ip
         }
 
-        return res.status(responseStatusCode).json(response);
+        return res.status(responseStatusCode).json(response)
     } catch (error) {
         return res.status(500).json({
             success: false,
@@ -36,9 +36,8 @@ const httpResponse = (
                 method: req.method,
                 url: req.originalUrl
             }
-        });
+        })
     }
 }
-
 
 module.exports = httpResponse

@@ -516,26 +516,23 @@ exports.getActiveDrivers = asyncHandler(async (req, res) => {
             pagination: { page, limit, total: 0 }
         })
     }
-    return httpResponse(
-        req,res,200,'Active drivers retrieved',
-        {
-            driver:driver.map(driver =>({
-                driverId: driver._id,
-                fullName:driver.fullName,
-                email:driver.email,
-                phoneNumber:driver.phoneNumber,
-                profile_image:driver.profile_image?.url,
-                joinedAt: driver.createdAt
-            })),
-            pagination:{
-                page,
-                limit,
-                total,
-                totalPages:Math.ceil(total/limit),
-                hasNextPage: page * limit < total
-            }
+    return httpResponse(req, res, 200, 'Active drivers retrieved', {
+        driver: driver.map((driver) => ({
+            driverId: driver._id,
+            fullName: driver.fullName,
+            email: driver.email,
+            phoneNumber: driver.phoneNumber,
+            profile_image: driver.profile_image?.url,
+            joinedAt: driver.createdAt
+        })),
+        pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+            hasNextPage: page * limit < total
         }
-    )
+    })
 })
 
 //driver request to admin Reactivation account..

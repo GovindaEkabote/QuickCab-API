@@ -1,33 +1,40 @@
-const Schema = mongoose.Schema;
-const mongoose = require("mongoose");
-
+const mongoose = require('mongoose')
+const Schema = mongoose.Schema
 
 const driverSchema = new Schema(
     {
-        user:{
-           type: mongoose.Schema.ObjectId,
-           ref:'User',
-           required:true
+        user: {
+            type: mongoose.Schema.ObjectId,
+            ref: 'User',
+            required: true
         },
-        license:{
-            number:String,
-            expiry:Date,
-            verified:Boolean
+        phoneNumber: {
+            type: String,
+            required: true // Enforce phone number
+        },
+        license: {
+            number: String,
+            expiry: Date,
+            verified: Boolean
         },
         vehicle: {
-            type: {  // e.g., "Sedan", "SUV", "Motorcycle"
+            type: {
+                // e.g., "Sedan", "SUV", "Motorcycle"
                 type: String,
                 trim: true
             },
-            make: {  // e.g., "Toyota", "Honda"
+            make: {
+                // e.g., "Toyota", "Honda"
                 type: String,
                 trim: true
             },
-            model: {  // e.g., "Camry", "Civic"
+            model: {
+                // e.g., "Camry", "Civic"
                 type: String,
                 trim: true
             },
-            year: {  // Manufacturing year
+            year: {
+                // Manufacturing year
                 type: Number,
                 min: 1900,
                 max: new Date().getFullYear() + 1
@@ -42,41 +49,70 @@ const driverSchema = new Schema(
                 trim: true
             }
         },
-        location:{
-            type:{
-                type:String,
-                default:'Point'
+        location: {
+            type: {
+                type: String,
+                default: 'Point',
+                enum: ['Point'],
+                required: true
             },
-            coordinates:[Number], // [langutude,latitude]
-            updatedAt:Date
-        },
-        status:{
-            type:String,
-            enum:['offline','available','in_ride','busy'],
-            default:'offline'
-        },
-        rating:{
-            average:{
-                type:Number,
-                min:1,
-                max:5,
-                default:5
-            },
-            count:{
-                type:Number,
-                default:0
+            coordinates: {
+                type: [Number], // [longitude, latitude]
+                required: true,
+                validate: {
+                    validator: function (coords) {
+                        return (
+                            coords.length === 2 &&
+                            typeof coords[0] === 'number' &&
+                            typeof coords[1] === 'number'
+                        )
+                    },
+                    message:
+                        'Coordinates must be an array of two numbers [longitude, latitude]'
+                }
             }
         },
-        document:[{
-            type:{
-                type:String,
-                enum:['license','rc','insurance']
+        status: {
+            type: String,
+            enum: ['offline', 'available', 'in_ride', 'busy'],
+            default: 'offline'
+        },
+        rating: {
+            average: {
+                type: Number,
+                min: 1,
+                max: 5,
+                default: 5
             },
-            url:String,
-            verified: Boolean
-        }],
-        createdAt:Date
-    }
+            count: {
+                type: Number,
+                default: 0
+            }
+        },
+        document: [
+            {
+                type: {
+                    type: String,
+                    enum: ['license', 'rc', 'insurance']
+                },
+                url: String,
+                verified: Boolean
+            }
+        ],
+        isOnline: {
+            type: Boolean,
+            default: false
+        }
+    },
+    { timestamps: true }
 )
 
-module.exports = mongoose.model("Driver", driverSchema);
+// Only create one 2dsphere index
+driverSchema.index({
+    location: '2dsphere',
+    status: 1,
+    isOnline: 1,
+    'vehicle.type': 1
+})
+
+module.exports = mongoose.model('Driver', driverSchema)

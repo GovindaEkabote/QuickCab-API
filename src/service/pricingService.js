@@ -1,43 +1,38 @@
+// pricingService.js
 const FareConfiguration = require('../model/fareConfiguration.model')
-const httpResponse = require('../util/httpResponse')
 
-async function calculateFare(distance, duration, vehicleType = 'standard') {
-    // Get current fare configuration
-    const config = await FareConfiguration.findOne({ isActive: true })
-    if (!config) {
-        return httpResponse(req, res, 400, 'No active fare configuration found')
-    }
-    // Find vehicle type multiplier
-    const vehicleConfig = config.vehicleTypes.find(
-        (vt) => vt.type === vehicleType
-    )
-    const vehicleMultiplier = vehicleConfig ? vehicleConfig.multiplier : 1.0
+async function calculateFare({ distance, duration, vehicleType = 'standard' }) {
+    // Input validation
+    if (isNaN(distance) || distance <= 0) throw new Error('Invalid distance')
+    if (isNaN(duration) || duration <= 0) throw new Error('Invalid duration')
 
-    // Calculate fare components
-    const base = config.baseFare * vehicleMultiplier
-    const distanceFare =
-        (distance / 1000) * config.perKmRate * vehicleMultiplier // Convert meters to km
-    const timeFare = (duration / 60) * config.perMinuteRate * vehicleMultiplier // Convert seconds to minutes
+    const config = await FareConfiguration.findOne({ isActive: true }).lean()
+    if (!config) throw new Error('No active fare configuration')
 
-    // Calculate fuel surcharge
-    const fuelSurcharge =
-        (base + distanceFare + timeFare) *
-        (config.fuelSurchargePercentage / 100)
+    // Get vehicle multiplier
+    const vehicle = config.vehicleTypes.find((v) => v.type === vehicleType)
+    const multiplier = vehicle?.multiplier || 1.0
 
-    const subtotal = base + distanceFare + timeFare + fuelSurcharge
-    const total = Math.max(config.minFare, Math.round(subtotal * 100) / 100) // Ensure minimum fare
+    // Convert units
+    const distanceKm = distance / 1000 // meters to km
+    const durationMinutes = duration / 60 // seconds to minutes
+
+    // Calculate components
+    const base = config.baseFare * multiplier
+    const distanceCost = distanceKm * config.perKmRate * multiplier
+    const timeCost = durationMinutes * config.perMinuteRate * multiplier
+    const subtotal = base + distanceCost + timeCost
+    const fuelSurcharge = subtotal * (config.fuelSurchargePercentage / 100)
+    const total = Math.max(config.minFare, subtotal + fuelSurcharge)
 
     return {
-        base,
-        distance: distanceFare,
-        time: timeFare,
-        fuelSurcharge,
-        vehicleMultiplier,
-        total,
+        base: parseFloat(base.toFixed(2)),
+        distance: parseFloat(distanceCost.toFixed(2)),
+        time: parseFloat(timeCost.toFixed(2)),
+        surge: 1, // Default, can be modified later
+        total: parseFloat(total.toFixed(2)),
         configurationId: config._id
     }
 }
 
-module.exports = {
-    calculateFare
-}
+module.exports = { calculateFare }
