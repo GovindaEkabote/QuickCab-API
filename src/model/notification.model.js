@@ -34,6 +34,7 @@ const notificationSchema = new Schema(
             enum: ['sent', 'delivered', 'read', 'expired', 'failed'],
             default: 'sent'
         },
+
         title: String,
         message: String,
         data: Schema.Types.Mixed, // Additional payload data

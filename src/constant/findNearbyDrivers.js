@@ -1,5 +1,5 @@
 const Driver = require('../model/driver.model')
-const notificationModel = require('../model/notification.model')
+const Notification = require('../model/notification.model')
 const { emitToDriver } = require('../service/socketService')
 const { logger } = require('../util/logger')
 
@@ -84,58 +84,72 @@ async function findNearbyDrivers(
     }
 }
 
+const MAX_PARALLEL_NOTIFICATIONS = 5 // Limit concurrent notifications
+
 async function notifyDrivers(drivers, ride) {
     try {
+        // Input validation
         if (!drivers || !Array.isArray(drivers)) {
             throw new Error('Invalid drivers array')
         }
+
         if (!ride || !ride._id) {
             throw new Error('Invalid ride object')
         }
 
-        const notifications = []
+        if (drivers.length === 0) {
+            logger.warn('No drivers to notify')
+            return []
+        }
+
         const expiryTime = new Date(Date.now() + RIDE_REQUEST_EXPIRY)
+        const notifications = []
+        const failedNotifications = []
 
         logger.info(
             `Notifying ${drivers.length} drivers about ride ${ride._id}`
         )
 
-        for (const driver of drivers) {
-            try {
-                const notification = await notificationModel.create({
-                    recipient: driver._id,
-                    ride: ride._id,
-                    type: 'ride_request',
-                    status: 'sent',
-                    expiresAt: expiryTime,
-                    data: {
-                        rideId: ride._id,
-                        pickup: ride.pickup,
-                        destination: ride.destination,
-                        fare: ride.fare?.total,
-                        distance: driver.distance,
-                        vehicleType: ride.vehicleType
-                    }
-                })
+        // Process drivers in batches to avoid overloading the system
+        const batchSize = Math.min(MAX_PARALLEL_NOTIFICATIONS, drivers.length)
 
-                await emitToDriver(driver._id, 'new_ride_request', {
-                    rideId: ride._id,
-                    pickup: ride.pickup,
-                    destination: ride.destination,
-                    fare: ride.fare?.total,
-                    distance: driver.distance,
-                    expiresAt: expiryTime,
-                    vehicleType: ride.vehicleType
-                })
+        for (let i = 0; i < drivers.length; i += batchSize) {
+            const batch = drivers.slice(i, i + batchSize)
 
-                notifications.push(notification)
-            } catch (notificationError) {
-                logger.error(
-                    `Failed to notify driver ${driver._id}:`,
-                    notificationError
+            const batchResults = await Promise.allSettled(
+                batch.map((driver) =>
+                    processDriverNotification(driver, ride, expiryTime)
                 )
-                // Continue with other drivers
-            }
+            )
+
+            batchResults.forEach((result, index) => {
+                if (result.status === 'fulfilled') {
+                    notifications.push(result.value)
+                } else {
+                    const driver = batch[index]
+                    failedNotifications.push({
+                        driverId: driver._id,
+                        error: result.reason
+                    })
+                    logger.error(
+                        `Failed to notify driver ${driver._id}:`,
+                        result.reason
+                    )
+                }
+            })
+        }
+
+        // Log summary
+        logger.info(`Notification summary for ride ${ride._id}:`, {
+            totalDrivers: drivers.length,
+            successful: notifications.length,
+            failed: failedNotifications.length,
+            failedDriverIds: failedNotifications.map((f) => f.driverId)
+        })
+
+        // If all notifications failed, throw an error
+        if (notifications.length === 0 && drivers.length > 0) {
+            throw new Error('All driver notifications failed')
         }
 
         return notifications
@@ -143,6 +157,60 @@ async function notifyDrivers(drivers, ride) {
         logger.error('Error in notifyDrivers:', error)
         throw error
     }
+}
+
+async function processDriverNotification(driver, ride, expiryTime) {
+    // Validate driver object
+    if (!driver || !driver._id) {
+        throw new Error('Invalid driver object')
+    }
+
+    // Create database notification
+    const notification = await Notification.create({
+        recipient: driver._id,
+        recipientType: 'Driver',
+        ride: ride._id,
+        type: 'ride_request',
+        title: 'New Ride Request',
+        message: `New ride available near ${ride.pickup.address}`,
+        status: 'sent',
+        expiresAt: expiryTime,
+        data: {
+            rideId: ride._id,
+            pickup: ride.pickup,
+            destination: ride.destination,
+            fare: ride.fare?.total,
+            distance: driver.distance,
+            vehicleType: ride.vehicleType,
+            estimatedDuration: ride.estimatedDuration,
+            userRating: ride.user?.rating // Include user rating if available
+        }
+    })
+
+    // Prepare real-time notification payload
+    const payload = {
+        notificationId: notification._id,
+        rideId: ride._id,
+        pickup: ride.pickup,
+        destination: ride.destination,
+        fare: ride.fare?.total,
+        distance: driver.distance,
+        expiresAt: expiryTime,
+        vehicleType: ride.vehicleType,
+        estimatedDuration: ride.estimatedDuration,
+        userRating: ride.user?.rating,
+        createdAt: new Date()
+    }
+
+    // Send real-time notification
+    await emitToDriver(driver._id.toString(), 'new_ride_request', payload)
+
+    // Update driver's last notified time (optional)
+    await Driver.findByIdAndUpdate(driver._id, {
+        $set: { lastNotifiedAt: new Date() }
+    })
+
+    return notification
 }
 
 module.exports = {
