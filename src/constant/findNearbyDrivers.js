@@ -7,6 +7,7 @@ const { logger } = require('../util/logger')
 const MAX_DRIVER_DISTANCE = 5000 // 5km
 const DRIVER_LIMIT = 10
 const RIDE_REQUEST_EXPIRY = 60000 // 1 minute
+const MAX_PARALLEL_NOTIFICATIONS = 5 // Limit concurrent notifications
 
 async function findNearbyDrivers(
     pickupCoords,
@@ -83,8 +84,6 @@ async function findNearbyDrivers(
         throw error
     }
 }
-
-const MAX_PARALLEL_NOTIFICATIONS = 5 // Limit concurrent notifications
 
 async function notifyDrivers(drivers, ride) {
     try {
