@@ -1,7 +1,12 @@
 // controller/driverController.js
 const Driver = require('../model/driver.model')
-const { emitToUser, emitToNearbyUsers } = require('../service/socketService')
+const {
+    emitToUser,
+    emitToDriver,
+    emitToNearbyUsers
+} = require('../service/socketService')
 const Ride = require('../model/rider.model')
+const Notification = require('../model/notification.model')
 const { asyncHandler } = require('../util/asyncHandler')
 const httpResponse = require('../util/httpResponse')
 const { logger } = require('../util/logger')
@@ -300,4 +305,111 @@ exports.getDriverStatus = asyncHandler(async (req, res) => {
     }
 
     return httpResponse(req, res, 200, 'Driver status retrieved', { driver })
+})
+
+exports.acceptRide = asyncHandler(async (req, res) => {
+    const { rideId } = req.params
+    const userId = req.user._id
+
+    // 1. First check if ride exists at all
+    const existingRide = await Ride.findById(rideId)
+    if (!existingRide) {
+        return httpResponse(req, res, 404, 'Ride not found')
+    }
+
+    // 2. Check expiration first (before querying driver)
+    if (existingRide.expiresAt < new Date()) {
+        return httpResponse(req, res, 400, 'Ride request has expired')
+    }
+
+    // 3. Find available driver
+    const driver = await Driver.findOne({
+        user: userId,
+        status: 'available',
+        isOnline: true
+    }).populate({
+        path: 'user',
+        select: 'fullName phoneNumber'
+    })
+
+    if (!driver) {
+        return httpResponse(req, res, 403, 'Driver not available', {
+            isOnline: driver?.isOnline,
+            status: driver?.status
+        })
+    }
+
+    // 4. Accept ride with atomic operation
+    const ride = await Ride.findOneAndUpdate(
+        {
+            _id: rideId,
+            status: 'requested',
+            driver: null,
+            expiresAt: { $gt: new Date() } // Still include for race conditions
+        },
+        {
+            $set: {
+                status: 'accepted',
+                driver: driver._id,
+                'timeline.acceptedAt': new Date()
+            }
+        },
+        { new: true }
+    ).populate('user')
+
+    if (!ride) {
+        // Final fallback check if race condition occurred
+        const currentRideState = await Ride.findById(rideId)
+        let reason = 'Ride no longer available'
+        if (currentRideState?.driver)
+            reason = 'Already accepted by another driver'
+        if (currentRideState?.status !== 'requested')
+            reason = `Ride is ${currentRideState?.status}`
+
+        return httpResponse(req, res, 400, reason)
+    }
+
+    // 5. Update driver status
+    await Driver.findByIdAndUpdate(driver._id, {
+        status: 'in_ride',
+        currentRide: rideId
+    })
+
+    // 6. Create notification (simplified)
+    const estimatedArrival = new Date(
+        Date.now() + (ride.estimatedDuration || 0) * 1000
+    )
+    await Notification.create({
+        recipient: ride.user._id,
+        recipientType: 'Rider',
+        type: 'ride_accepted',
+        title: 'Driver On The Way',
+        message: `${driver.user.fullName} is coming to pick you up`,
+        data: {
+            rideId: ride._id,
+            driver: {
+                name: driver.user.fullName,
+                phone: driver.user.phoneNumber
+            },
+            estimatedArrival
+        }
+    })
+
+    // 7. Real-time updates
+    await emitToUser(ride.user._id.toString(), 'ride_accepted', {
+        rideId: ride._id,
+        driver: {
+            name: driver.user.fullName,
+            eta: estimatedArrival
+        }
+    })
+
+    return httpResponse(req, res, 200, 'Ride accepted successfully', {
+        rideId: ride._id,
+        status: ride.status,
+        driver: {
+            id: driver._id,
+            name: driver.user.fullName
+        }
+    })
 })

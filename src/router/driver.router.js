@@ -22,18 +22,24 @@ router
         driverController.updateDriverStatus
     )
 
-router.patch(
-    '/location',
-    verifyAccessToken,
-    authorizeRole('driver'),
-    driverController.updateDriverLocation
-)
+router
+    .route('/location')
+    .patch(
+        verifyAccessToken,
+        authorizeRole('driver'),
+        driverController.updateDriverLocation
+    )
 
-router.get(
-    '/status',
-    verifyAccessToken,
-    authorizeRole('driver'),
-    driverController.getDriverStatus
-)
+router
+    .route('/status')
+    .get(
+        verifyAccessToken,
+        authorizeRole('driver'),
+        driverController.getDriverStatus
+    )
+
+router
+    .route('/:rideId/accept')
+    .post(verifyAccessToken, driverController.acceptRide)
 
 module.exports = router

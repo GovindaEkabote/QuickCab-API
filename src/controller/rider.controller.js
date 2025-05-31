@@ -1,3 +1,5 @@
+// controllers/rideController.js
+
 const { calculateFare } = require('../service/pricingService.js')
 const { asyncHandler } = require('../util/asyncHandler')
 const {
@@ -9,19 +11,16 @@ const {
     setDriverResponseTimeout
 } = require('../constant/setDriverResponseTimeout.js')
 const { calculateRoute } = require('../constant/calculateRoute.js')
-const { emitToDriver, emitToUser } = require('../service/socketService')
 const Ride = require('../model/rider.model.js')
-const Driver = require('../model/driver.model.js')
 
 exports.requestRide = asyncHandler(async (req, res) => {
     const {
         pickup,
         destination,
-        contactPhone = req.user.phoneNumber,
+        contactPhone = req.user?.phoneNumber,
         vehicleType = 'standard'
     } = req.body
 
-    // Enhanced validation with coordinate order checking
     const validateCoordinates = (coords, name) => {
         if (!Array.isArray(coords) || coords.length !== 2) {
             throw new Error(
@@ -34,9 +33,7 @@ exports.requestRide = asyncHandler(async (req, res) => {
             throw new Error(`${name} coordinates must contain numbers`)
         }
 
-        // Check if values might be swapped (common mistake)
         if (Math.abs(lng) > 180 || Math.abs(lat) > 90) {
-            console.warn(`Potential coordinate order issue in ${name}:`, coords)
             throw new Error(
                 `${name} coordinates must be in [longitude, latitude] order`
             )
@@ -46,14 +43,14 @@ exports.requestRide = asyncHandler(async (req, res) => {
     }
 
     try {
-        // Validate inputs
+        // Validate pickup and destination
         if (
             !pickup ||
             !destination ||
             typeof pickup !== 'object' ||
             typeof destination !== 'object'
         ) {
-            throw new Error('Pickup and destination objects required')
+            throw new Error('Pickup and destination objects are required')
         }
 
         const pickupCoords = validateCoordinates(pickup.coordinates, 'pickup')
@@ -66,13 +63,13 @@ exports.requestRide = asyncHandler(async (req, res) => {
             pickupCoords[0] === destinationCoords[0] &&
             pickupCoords[1] === destinationCoords[1]
         ) {
-            throw new Error('Pickup and destination cannot be identical')
+            throw new Error('Pickup and destination cannot be the same')
         }
 
         const validVehicleTypes = ['standard', 'xl', 'premium', 'luxury']
         if (!validVehicleTypes.includes(vehicleType)) {
             throw new Error(
-                `Invalid vehicle type. Must be one of: ${validVehicleTypes.join(', ')}`
+                `Invalid vehicle type. Choose from: ${validVehicleTypes.join(', ')}`
             )
         }
 
@@ -81,35 +78,22 @@ exports.requestRide = asyncHandler(async (req, res) => {
             await calculateRoute(pickupCoords, destinationCoords)
 
         if (
-            isNaN(estimatedDistance) ||
-            isNaN(estimatedDuration) ||
+            !estimatedDistance ||
+            !estimatedDuration ||
             estimatedDistance <= 0 ||
             estimatedDuration <= 0
         ) {
-            throw new Error('Invalid route calculation')
+            throw new Error('Failed to calculate route')
         }
 
         // Find nearby drivers
         const nearbyDrivers = await findNearbyDrivers(pickupCoords, vehicleType)
 
-        if (!nearbyDrivers || nearbyDrivers.length === 0) {
-            // Debug why no drivers are found
-            const availableDrivers = await Driver.countDocuments({
-                status: 'available',
-                isOnline: true,
-                'vehicle.type': vehicleType
-            })
-
-            console.log('Driver availability debug:', {
-                totalAvailable: availableDrivers,
-                searchLocation: pickupCoords,
-                vehicleType
-            })
-
+        if (!nearbyDrivers.length) {
             throw new Error('No available drivers found nearby')
         }
 
-        // Calculate fare with fallback
+        // Calculate fare
         let fare
         try {
             fare = await calculateFare({
@@ -119,15 +103,15 @@ exports.requestRide = asyncHandler(async (req, res) => {
             })
 
             if (!fare || typeof fare.total !== 'number' || fare.total <= 0) {
-                throw new Error('Invalid fare calculation')
+                throw new Error('Fare returned is invalid')
             }
-        } catch (fareError) {
-            console.error('Fare calculation error:', fareError)
-            // Fallback fare values
+        } catch (err) {
+            console.error('Fare calculation failed. Using fallback.', err)
+
             fare = {
                 base: 50,
-                distance: (estimatedDistance / 1000) * 10, // 10/km
-                time: (estimatedDuration / 60) * 1, // 1/minute
+                distance: (estimatedDistance / 1000) * 10,
+                time: (estimatedDuration / 60) * 1,
                 surge: 1,
                 total: Math.max(
                     100,
@@ -142,14 +126,14 @@ exports.requestRide = asyncHandler(async (req, res) => {
         // Create ride
         const ride = await Ride.create({
             user: req.user._id,
-            driver: null, // Will be set when driver accepts
+            driver: null,
             pickup: {
-                address: pickup.address || 'Address not specified',
+                address: pickup.address || 'Not provided',
                 coordinates: pickupCoords,
                 contactPhone
             },
             destination: {
-                address: destination.address || 'Address not specified',
+                address: destination.address || 'Not provided',
                 coordinates: destinationCoords
             },
             route: {
@@ -160,26 +144,23 @@ exports.requestRide = asyncHandler(async (req, res) => {
             estimatedDuration,
             fare,
             status: 'requested',
-            timeline: {
-                requestedAt: new Date()
-            },
-            vehicleType
+            timeline: { requestedAt: new Date() },
+            vehicleType,
+            expiresAt: new Date(Date.now() + 1 * 60 * 10000) // 1 minute expiry
         })
 
         // Notify drivers
         try {
             await notifyDrivers(nearbyDrivers, ride)
-            console.log(`Notified ${nearbyDrivers.length} drivers`)
-        } catch (notificationError) {
-            console.error('Driver notification error:', notificationError)
-            // Continue even if some notifications fail
+        } catch (notifyErr) {
+            console.error('Driver notification failed:', notifyErr)
         }
 
-        // Set timeout for driver response
+        // Set timeout for response
         setDriverResponseTimeout(ride._id)
 
-        // Prepare response data
-        const responseData = {
+        // Send response
+        return httpResponse(req, res, 201, 'Ride requested successfully', {
             ride: {
                 _id: ride._id,
                 status: ride.status,
@@ -194,7 +175,7 @@ exports.requestRide = asyncHandler(async (req, res) => {
                 drivers: nearbyDrivers.map((driver) => ({
                     id: driver._id,
                     name: driver.userDetails?.name || 'Driver',
-                    phone: driver.userDetails?.phoneNumber || 'Not available',
+                    phone: driver.userDetails?.phoneNumber || 'N/A',
                     vehicle: {
                         type: driver.vehicle?.type || 'standard',
                         make: driver.vehicle?.make || 'Unknown',
@@ -207,24 +188,11 @@ exports.requestRide = asyncHandler(async (req, res) => {
                     rating: driver.rating || 5.0,
                     profileImage: driver.userDetails?.profile_image || null
                 })),
-                expiresAt: new Date(Date.now() + 60000) // 1 minute expiry
+                expiresAt: ride.expiresAt
             }
-        }
-
-        return httpResponse(
-            req,
-            res,
-            201,
-            'Ride requested successfully',
-            responseData
-        )
-    } catch (error) {
-        console.error('Ride request failed:', {
-            error: error.message,
-            stack: error.stack,
-            body: req.body,
-            user: req.user?._id
         })
+    } catch (error) {
+        console.error('Ride request failed:', error)
 
         const statusCode =
             error.name === 'ValidationError'

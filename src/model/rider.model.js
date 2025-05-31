@@ -25,6 +25,9 @@ const riderSchema = new Schema({
         type: { type: String, default: 'LineString' },
         coordinates: [[Number]] // Polyline
     },
+    expiresAt: {
+        type: Date
+    },
     status: {
         type: String,
         enum: [
